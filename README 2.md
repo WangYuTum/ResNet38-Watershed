@@ -1,5 +1,4 @@
-# ResNet38-Watershed
-ResNet38 to perform semantic and instance segmentation on Cityscape dataset simultaneously.
+# ResNet38 on CIFAR10
 
 ## Implementation
 
@@ -27,4 +26,3 @@ Thanks for the GPU provided by [Computer Vision and Pattern Recongnition Group a
 - Try L2 weight decay of 0.0003, 0.0005
 - Try momentum optimizer
 - Try reducing number of parameters
-
