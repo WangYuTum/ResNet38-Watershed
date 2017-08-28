@@ -22,7 +22,7 @@ from scipy.ndimage import distance_transform_edt
 from scipy.sparse import save_npz
 from scipy.sparse import csc_matrix
 
-os.environ["CITYSCAPES_DATASET"] = "./data/CityDatabase"
+os.environ["CITYSCAPES_DATASET"] = "../data/CityDatabase"
 # os.environ["CITYSCAPES_DATASET"] = "/Users/WY/Desktop/TUM_profile/MyGit/ResNet38-Watershed/dataset"
 
 def get_file_list(cityscapes_path):
