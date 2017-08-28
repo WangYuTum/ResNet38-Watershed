@@ -1,6 +1,8 @@
 # ResNet38-Watershed
 ResNet38 to perform semantic and instance segmentation on Cityscape dataset simultaneously.
 
+This README file is continued to be updated.
+
 ## Implementation
 
 Implement original Model A in paper [Wider or Deeper: Revisiting the ResNet Model for Visual Recognition](https://arxiv.org/abs/1611.10080).
