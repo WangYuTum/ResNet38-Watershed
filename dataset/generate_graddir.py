@@ -21,8 +21,10 @@ from scipy.misc import imsave
 from scipy.ndimage import distance_transform_edt
 from scipy.sparse import save_npz
 from scipy.sparse import csc_matrix
+import multiprocessing
 
 os.environ["CITYSCAPES_DATASET"] = "../data/CityDatabase"
+os.environ["NUM_PROCESSES"] = "25"
 # os.environ["CITYSCAPES_DATASET"] = "/Users/WY/Desktop/TUM_profile/MyGit/ResNet38-Watershed/dataset"
 
 def get_file_list(cityscapes_path):
@@ -84,8 +86,35 @@ def main():
         cityscapes_path = os.environ['CITYSCAPES_DATASET']
     files = get_file_list(cityscapes_path)
 
-    progress = 0
-    print("Progress: {:>3} %".format( progress * 100 / len(files) ))
+    if 'NUM_PROCESSES' in os.environ:
+        num_processes = int(os.environ["NUM_PROCESSES"])
+    else:
+        num_processes = 6
+    # progress = 0
+    # print("Progress: {:>3} %".format( progress * 100 / len(files) ))
+
+    offsets = []
+    process_pool = []
+    is_dividable = True
+    if len(files) % num_processes != 0:
+        is_dividable = False
+    chunk_size = int(len(files) / num_processes)
+
+    for i in range(num_processes):
+        offsets.append(i*chunk_size)
+        if i != num_processes-1:
+            process_pool.append(multiprocessing.Process(target=generate_grad, args=(files[i*num_processes: (i+1)*num_processes],)))
+        else:
+            process_pool.append(multiprocessing.Process(target=generate_grad, args=(files[i*num_processes:],)))
+    for i in range(num_processes):
+        process_pool[i].start()
+    for i in range(num_processes):
+        process_pool[i].join()
+
+    print("Generate graddir done!")
+
+def generate_grad(files):
+
     for fname in files:
         image = open_gt_file(fname)
         graddir = create_graddir_per_image(image)
@@ -95,12 +124,6 @@ def main():
         graddir = np.reshape(graddir, (1024,2048*3))
         graddir_sparse = csc_matrix(graddir)
         save_npz(fname, graddir_sparse)
-
-        progress += 1
-        print("\rProgress: {:>3} %".format( progress * 100 / len(files) ))
-        sys.stdout.flush()
-
-    print("Generate graddir done!")
 
 if __name__ == "__main__":
     main()
