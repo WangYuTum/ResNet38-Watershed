@@ -6,10 +6,13 @@
 
 # Any images
 *.png
+*.npz
 
 # IPython Notebook
-.ipynb_checkpoints
-.ipynb
+*.ipynb_checkpoints
+*.ipynb
+dataset/*.ipynb
+dataset/*.npz
 
 # Any folders
 data/
