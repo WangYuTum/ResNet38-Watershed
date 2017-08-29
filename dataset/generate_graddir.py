@@ -93,19 +93,14 @@ def main():
     # progress = 0
     # print("Progress: {:>3} %".format( progress * 100 / len(files) ))
 
-    offsets = []
     process_pool = []
-    is_dividable = True
-    if len(files) % num_processes != 0:
-        is_dividable = False
     chunk_size = int(len(files) / num_processes)
 
     for i in range(num_processes):
-        offsets.append(i*chunk_size)
         if i != num_processes-1:
-            process_pool.append(multiprocessing.Process(target=generate_grad, args=(files[i*num_processes: (i+1)*num_processes],)))
+            process_pool.append(multiprocessing.Process(target=generate_grad, args=(files[i*chunk_size: (i+1)*chunk_size],)))
         else:
-            process_pool.append(multiprocessing.Process(target=generate_grad, args=(files[i*num_processes:],)))
+            process_pool.append(multiprocessing.Process(target=generate_grad, args=(files[i*chunk_size:],)))
     for i in range(num_processes):
         process_pool[i].start()
     for i in range(num_processes):
