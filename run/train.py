@@ -3,19 +3,23 @@ from __future__ import division
 from __future__ import print_function
 
 import os,sys
+sys.path.append("..")
 import numpy as np
 import tensorflow as tf
 import data_utils as dt
 from core import resnet38
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 config_gpu = tf.ConfigProto()
-config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.6 
+config_gpu.gpu_options.per_process_gpu_memory_fraction = 1.0
 
-train_data_params = {'data_path': 'data/cifar-10-batches-py/',
-                     'batch_size': 128,
-                     'mode': 'Train'}
-dataset = dt.CIFAR10(train_data_params)
+train_data_params = {'data_dir': '../data/CityDatabase',
+                     'dataset': 'train',
+                     'batch_size': 1,
+                     'pred_save_path': '../data/pred_trainIDs',
+                     'colored_save_path': '../data/pred_colored',
+                     'labelIDs_save_path': '../data/pred_labelIDs'}
+dataset = dt.CityDataSet(train_data_params)
 
 params = {'batch_size': 128,
           'decay_rate': 0.0002,

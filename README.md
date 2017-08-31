@@ -5,28 +5,26 @@ This README file is continued to be updated.
 
 ## Implementation
 
-Implement original Model A in paper [Wider or Deeper: Revisiting the ResNet Model for Visual Recognition](https://arxiv.org/abs/1611.10080).
-Downsampling 3 times with maxpool. No dilated convolution. No dropout.
+Implement original Model A1, 2convs in paper [Wider or Deeper: Revisiting the ResNet Model for Visual Recognition](https://arxiv.org/abs/1611.10080).
+Downsampling 3 times with convolution stride=2 before B2, B3 and B4.
+Use dilated convolution in B5(rate=2), B6(rate=4), B7(rate=4) and the last two convolution layers(rate=12)
+Use dropout: dropout rate=0.3 for 2048 channels, dropout rate=0.5 for 4096 channels.
 
-Model A structure: Input(32x32) -> B0 -> max-pool -> B2(x3) -> max-pool -> B3(x3) -> max-pool -> B4(x6) -> B5(x3) -> B6(x1) -> B7(x1) ->
-Global-avg-pool -> Fully connected -> Softmax
+Model A structure: Input -> B0 -> B2(stride=2, x3) -> B3(stride=2, x3) -> B4(stride=2, x6) -> B5(rate=2, x3) -> B6(rate=4, x1) -> B7(rate=4, x1) ->
+Tail(BN+2convs, rate=12) -> Softmax
 
 ## Results
 
 - Under development
-- Best accuracy so far: 91.47%
-- Data set: 50000 training image. 10000 test images(not used for training).
-- Data augmentation: Per image standardization. Per image pad to 36x36, then randomly crop to 32x32. Randomly shuffle all images per epoch. Per image randomly flip during training.
-- Training: Train 130 epochs. Batch 128. Adam optimizer(initial learning rate 0.001(40 epoch) -> 0.0001(100 epoch) -> 0.00001(100 epoch, todo) ). L2 weight decay 0.0002.
-- Device: GTX TITAN (Pascal) 12GB
+- Best accuracy on semantic: ??
+- Best accuracy on instance: ??
+- Data set: 2975 training image(1024x2048). 500 val images(not used for training). 1525 test images(without GT) 
+- Data augmentation: Per image standardization, randomly flip, randomly crop? Per epoch randomly shuffle?
+- Training: Train ?? epochs. Batch ??. Adam optimizer(rate=0.001 -> ). L2 weight decay 0.0002.
+- Device: Quadro P6000 24GB
 
 ## Acknowledge
 
 Thanks for the GPU provided by [Computer Vision and Pattern Recongnition Group at Technical University Munich](https://vision.in.tum.de/)
 
 ## TODO
-
-- Try L2 weight decay of 0.0003, 0.0005
-- Try momentum optimizer
-- Try reducing number of parameters
-
