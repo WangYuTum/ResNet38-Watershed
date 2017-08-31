@@ -33,9 +33,9 @@ class CityDataSet():
         self._pred_save_path = params.get('pred_save_path','../data/pred_trainIDs')
         self._colored_save_path = params.get('colored_save_path', '../data/pred_colored')
         self._labelIDs_save_path = params.get('labelIDs_save_path', '../data/pred_labelIDs')
-	self._num_images = 0
-	self._num_batches = 0
-	self._batch_idx = 0
+        self._num_images = 0
+        self._num_batches = 0
+        self._batch_idx = 0
 
         # Create mapping of (lable_name, id, color)
         self._labels = [
@@ -63,8 +63,8 @@ class CityDataSet():
         self._trainId2Color = [label.color for label in self._labels]
         self._trainId2labelId = [label.labelId for label in self._labels]
 
-	# Load dataset indices
-	(self._img_indices, self._lbl_indices) = self._load_indicies()
+        # Load dataset indices
+        (self._img_indices, self._lbl_indices) = self._load_indicies()
 
     def _load_indicies(self):
 
@@ -108,8 +108,8 @@ class CityDataSet():
         batch_idx = self._batch_idx
         total_batches = self._num_batches
         total_images = self._num_images
-	image_batch = None
-	label_batch = None
+        image_batch = None
+        label_batch = None
 
         if batch_idx < total_batches:
             image_batch, label_batch = self._get_batch(batch_idx*self._batch_size, (batch_idx+1)*self._batch_size)
@@ -170,12 +170,15 @@ class CityDataSet():
 
         image = np.array(img, dtype=np.float32)
         ## TODO. Do not switch RGB to BGR since we use pre-trained weights from MXnet.
-	## NOTE: This has effect.
+        ## NOTE: This has effect.
         # image = image[:,:,::-1]     # RGB -> BGR
 
         ## TODO: per image standardization
-	## NOTE, TODO: This has effect, confirm image preprocessign from MXnext
+        ## NOTE, TODO: This has effect, confirm image preprocessign from MXnext
         # image = self._per_image_standardization(image)
+
+        ## NOTE: use standardization procedure from MXnet implementation
+        image = self._transform_image(image)
 
         return image
 
@@ -210,8 +213,8 @@ class CityDataSet():
         image_mean = np.mean(image)
         num_elements = image_shape[0] * image_shape[1] * image_shape[2]
         variance = np.mean(np.square(image)) - np.square(image_mean)
-	print("variance: {0}".format(variance))
-	print("mean: {0}".format(image_mean))
+        print("variance: {0}".format(variance))
+        print("mean: {0}".format(image_mean))
         variance = np.maximum(variance, 0.0)
         stddev = np.sqrt(variance)
         min_stddev = np.sqrt(num_elements)
@@ -224,6 +227,22 @@ class CityDataSet():
 
         return normed_image
 
+    def _transform_image(self, image):
+        '''
+            The standardization procedure used in MXnet implementation.
+        '''
+        # color scale
+        image *= image
+
+        # subtract mean for each channel
+        mean = np.array([0.485, 0.456, 0.406]).reshape((1, 1, 3))
+        image -= mean
+
+        # divide std for each channel
+        std = np.array([0.229, 0.224, 0.225]).reshape((1, 1, 3)))
+        image /= std
+
+        return image
 
     def _padding_func(self, vector, iaxis_pad_width, iaxis, kwargs):
         '''

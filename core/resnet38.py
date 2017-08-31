@@ -14,7 +14,7 @@ import data_utils as dt
 class ResNet38:
     def __init__(self, params):
 
-	## use pre-trained A1 model on Cityscapes unless specified
+        ## use pre-trained A1 model on Cityscapes unless specified
         weight_path = params.get('feed_weight', '../data/trained_weights/pretrained_ResNet38a1_city.npy')
         self._weight_dict = dt.load_weight(weight_path)
         self._var_dict = {}

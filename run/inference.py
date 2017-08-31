@@ -49,7 +49,7 @@ with tf.Session(config=config_gpu) as sess:
         next_pair = dataset.next_batch()
         next_pair_image = next_pair[0]
 
-	print("shape of img: {0}".format(np.shape(next_pair_image)))
+        print("shape of img: {0}".format(np.shape(next_pair_image)))
         feed_dict_ = {img: next_pair_image}
 
         pred_out = sess.run(predict, feed_dict=feed_dict_)
