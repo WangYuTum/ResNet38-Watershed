@@ -33,9 +33,9 @@ class CityDataSet():
         self._pred_save_path = params.get('pred_save_path','../data/pred_trainIDs')
         self._colored_save_path = params.get('colored_save_path', '../data/pred_colored')
         self._labelIDs_save_path = params.get('labelIDs_save_path', '../data/pred_labelIDs')
-
-        # Load dataset indices
-        (self._img_indices, self._lbl_indices) = self._load_indicies()
+	self._num_images = 0
+	self._num_batches = 0
+	self._batch_idx = 0
 
         # Create mapping of (lable_name, id, color)
         self._labels = [
@@ -62,9 +62,9 @@ class CityDataSet():
         ]
         self._trainId2Color = [label.color for label in self._labels]
         self._trainId2labelId = [label.labelId for label in self._labels]
-        self._num_images = 0
-        self._num_batches = 0
-        self._batch_idx = 0
+
+	# Load dataset indices
+	(self._img_indices, self._lbl_indices) = self._load_indicies()
 
     def _load_indicies(self):
 
@@ -80,7 +80,7 @@ class CityDataSet():
         files_img.sort()
 
         # Load GT semantic mask
-        if self._mode == 'train'
+        if self._mode == 'train':
             search_lbl = os.path.join(self._dir,
                                       'gtFine',
                                       self._mode,
@@ -108,6 +108,8 @@ class CityDataSet():
         batch_idx = self._batch_idx
         total_batches = self._num_batches
         total_images = self._num_images
+	image_batch = None
+	label_batch = None
 
         if batch_idx < total_batches:
             image_batch, label_batch = self._get_batch(batch_idx*self._batch_size, (batch_idx+1)*self._batch_size)
@@ -168,10 +170,12 @@ class CityDataSet():
 
         image = np.array(img, dtype=np.float32)
         ## TODO. Do not switch RGB to BGR since we use pre-trained weights from MXnet.
+	## NOTE: This has effect.
         # image = image[:,:,::-1]     # RGB -> BGR
 
         ## TODO: per image standardization
-        image = self._per_image_standardization(image)
+	## NOTE, TODO: This has effect, confirm image preprocessign from MXnext
+        # image = self._per_image_standardization(image)
 
         return image
 
@@ -197,7 +201,7 @@ class CityDataSet():
         if np.ndim(image) == 4 and np.shape(image)[0] != 1:
             sys.exit('Per Image Standardization shape error!')
         else:
-            image = np.reshape(image, (32,32,3))
+            image = np.reshape(image, (1024,2048,3))
 
         # Standardization
         # use np.int64 in case of numeircal issues
@@ -206,6 +210,8 @@ class CityDataSet():
         image_mean = np.mean(image)
         num_elements = image_shape[0] * image_shape[1] * image_shape[2]
         variance = np.mean(np.square(image)) - np.square(image_mean)
+	print("variance: {0}".format(variance))
+	print("mean: {0}".format(image_mean))
         variance = np.maximum(variance, 0.0)
         stddev = np.sqrt(variance)
         min_stddev = np.sqrt(num_elements)
@@ -225,7 +231,7 @@ class CityDataSet():
         '''
         if iaxis == 3:
             idx = vector[0]
-            values = self.trainId2Color[idx]
+            values = self._trainId2Color[idx]
             vector[-iaxis_pad_width[1]:] = values
 
         return vector
