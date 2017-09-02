@@ -173,7 +173,7 @@ def ResUnit_tail(input_tensor, feed_dict, shape_dict, var_dict=None):
     # The batch norm layer
     BN_out1 = BN(input_tensor=input_tensor, feed_dict=feed_dict,
                  bn_scope='bn1', is_train=is_train,
-                 shape=shape_dict, var_dict=var_dict)
+                 shape=shape_dict[0][2], var_dict=var_dict)
     RELU_out1 = ReLu_layer(BN_out1)
 
     # The first dilated conv layer

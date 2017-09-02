@@ -16,9 +16,9 @@ Support scripts needed:
 
  USAGE:
   - Put all ground truth files (validation groundtruth - <city>_123456_123456_gtFine_labelIds.png ) in :
-    os.environ['CITYSCAPES_GROUNDTRUTH']
+  	os.environ['CITYSCAPES_GROUNDTRUTH']
   - Put all prediction files (validation predictions - <city>_123456_123456*.png ) in:
-    os.environ['CITYSCAPES_RESULTS']
+  	os.environ['CITYSCAPES_RESULTS']
   - The number of prediction files and number of groundtruth MUST be the same.
   - The evaluation method reads prediction results in os.environ['CITYSCAPES_RESULTS']
     and groundtruth files in os.environ['CITYSCAPES_GROUNDTRUTH'] to Calculate accuracy.
@@ -46,9 +46,9 @@ if CSUPPORT:
 
 os.environ['CITYSCAPES_DATASET'] = '../data/CityDatabase'
 # To specify where the predictions are
-os.environ['CITYSCAPES_RESULTS'] = '../data/test_city_labelIDs'
+os.environ['CITYSCAPES_RESULTS'] = '../data/pred_labelIDs'
 # To specify where the ground truth are
-os.environ['CITYSCAPES_GROUNDTRUTH'] = '../data/test_city_valGT'
+# os.environ['CITYSCAPES_GROUNDTRUTH'] = '../data/val_GTs'
 
 
 ###################
@@ -194,8 +194,8 @@ def generateInstanceStats(args):
 # Calculate and return IOU score for a particular label
 def getIouScoreForLabel(label, confMatrix, args):
     if id2label[label].ignoreInEval:
-        if args.debug:
-            print('label %s is ignored.'%label)
+    	if args.debug:
+    		print('label %s is ignored.'%label)
         return float('nan')
 
     # the number of true positive pixels for this label
@@ -217,8 +217,8 @@ def getIouScoreForLabel(label, confMatrix, args):
     # the denominator of the IOU score
     denom = (tp + fp + fn)
     if denom == 0:
-        if args.debug:
-            print('label %s denom is 0.'%label)
+    	if args.debug:
+    		print('label %s denom is 0.'%label)
         return float('nan')
 
     # return IOU
@@ -263,7 +263,7 @@ def getScoreAverage(scoreList, args):
             validScores += 1
             scoreSum += scoreList[score]
     if validScores == 0:
-        print('getAverage: valid score is 0.')
+    	print('getAverage: valid score is 0.')
         return float('nan')
     return scoreSum / validScores
 
@@ -321,7 +321,7 @@ def evaluateImgLists(predictionImgList, groundTruthImgList, args):
 
 		# sanity check
 		if confMatrix.sum() != nbPixels:
-			printError('Number of analyzed pixels and entries in confusion matrix disagree: contMatrix {}, pixels {}'.format(confMatrix.sum(),nbPixels))
+		    printError('Number of analyzed pixels and entries in confusion matrix disagree: contMatrix {}, pixels {}'.format(confMatrix.sum(),nbPixels))
 
 		if not args.quiet:
 			print("\rImages Processed: {}".format(i+1), end=' ')
@@ -336,7 +336,7 @@ def evaluateImgLists(predictionImgList, groundTruthImgList, args):
     # print confusion matrix
 	'''
 	if (not args.quiet):
-        printConfMatrix(confMatrix, args)
+	    printConfMatrix(confMatrix, args)
 	'''
 
     # Calculate IOU scores on class level from matrix
@@ -356,23 +356,23 @@ def evaluateImgLists(predictionImgList, groundTruthImgList, args):
 	'''
 	classInstScoreList = {}
 	for label in args.evalLabels:
-        labelName = id2label[label].name
-        classInstScoreList[labelName] = getInstanceIouScoreForLabel(label, confMatrix, instStats, args)
+	    labelName = id2label[label].name
+	    classInstScoreList[labelName] = getInstanceIouScoreForLabel(label, confMatrix, instStats, args)
 	'''
 
 
     # Print IOU scores
 	'''
 	if (not args.quiet):
-        print("")
-        print("")
-        printClassScores(classScoreList, classInstScoreList, args)
-        iouAvgStr  = getColorEntry(getScoreAverage(classScoreList, args), args) + "{avg:5.3f}".format(avg=getScoreAverage(classScoreList, args)) + args.nocol
-        niouAvgStr = getColorEntry(getScoreAverage(classInstScoreList , args), args) + "{avg:5.3f}".format(avg=getScoreAverage(classInstScoreList , args)) + args.nocol
-        print("--------------------------------")
-        print("Score Average : " + iouAvgStr + "    " + niouAvgStr)
-        print("--------------------------------")
-        print("")
+	    print("")
+	    print("")
+	    printClassScores(classScoreList, classInstScoreList, args)
+	    iouAvgStr  = getColorEntry(getScoreAverage(classScoreList, args), args) + "{avg:5.3f}".format(avg=getScoreAverage(classScoreList, args)) + args.nocol
+	    niouAvgStr = getColorEntry(getScoreAverage(classInstScoreList , args), args) + "{avg:5.3f}".format(avg=getScoreAverage(classInstScoreList , args)) + args.nocol
+	    print("--------------------------------")
+	    print("Score Average : " + iouAvgStr + "    " + niouAvgStr)
+	    print("--------------------------------")
+	    print("")
 	'''
 
 
@@ -380,23 +380,23 @@ def evaluateImgLists(predictionImgList, groundTruthImgList, args):
 	'''
 	categoryScoreList = {}
 	for category in category2labels.keys():
-        categoryScoreList[category] = getIouScoreForCategory(category,confMatrix,args)
+	    categoryScoreList[category] = getIouScoreForCategory(category,confMatrix,args)
 
 	# Calculate instance IOU scores on category level from matrix
 	categoryInstScoreList = {}
 	for category in category2labels.keys():
-        categoryInstScoreList[category] = getInstanceIouScoreForCategory(category,confMatrix,instStats,args)
+	    categoryInstScoreList[category] = getInstanceIouScoreForCategory(category,confMatrix,instStats,args)
 
 	# Print IOU scores
 	if (not args.quiet):
-        print("")
-        printCategoryScores(categoryScoreList, categoryInstScoreList, args)
-        iouAvgStr = getColorEntry(getScoreAverage(categoryScoreList, args), args) + "{avg:5.3f}".format(avg=getScoreAverage(categoryScoreList, args)) + args.nocol
-        niouAvgStr = getColorEntry(getScoreAverage(categoryInstScoreList, args), args) + "{avg:5.3f}".format(avg=getScoreAverage(categoryInstScoreList, args)) + args.nocol
-        print("--------------------------------")
-        print("Score Average : " + iouAvgStr + "    " + niouAvgStr)
-        print("--------------------------------")
-        print("")
+	    print("")
+	    printCategoryScores(categoryScoreList, categoryInstScoreList, args)
+	    iouAvgStr = getColorEntry(getScoreAverage(categoryScoreList, args), args) + "{avg:5.3f}".format(avg=getScoreAverage(categoryScoreList, args)) + args.nocol
+	    niouAvgStr = getColorEntry(getScoreAverage(categoryInstScoreList, args), args) + "{avg:5.3f}".format(avg=getScoreAverage(categoryInstScoreList, args)) + args.nocol
+	    print("--------------------------------")
+	    print("Score Average : " + iouAvgStr + "    " + niouAvgStr)
+	    print("--------------------------------")
+	    print("")
 	'''
 
     # write result file
@@ -427,12 +427,12 @@ def evaluatePair(predictionImgFileName, groundTruthImgFileName, confMatrix, inst
     # load ground truth instances, if needed. False anyway for now.
 	'''
 	if args.evalInstLevelScore:
-        groundTruthInstanceImgFileName = groundTruthImgFileName.replace("labelIds","instanceIds")
-        try:
-            instanceImg = Image.open(groundTruthInstanceImgFileName)
-            instanceNp  = np.array(instanceImg)
-        except:
-            printError("Unable to load " + groundTruthInstanceImgFileName)
+	    groundTruthInstanceImgFileName = groundTruthImgFileName.replace("labelIds","instanceIds")
+	    try:
+	        instanceImg = Image.open(groundTruthInstanceImgFileName)
+	        instanceNp  = np.array(instanceImg)
+	    except:
+	        printError("Unable to load " + groundTruthInstanceImgFileName)
 	'''
 
     # Check for equal image sizes
@@ -460,46 +460,46 @@ def evaluatePair(predictionImgFileName, groundTruthImgFileName, confMatrix, inst
 			confMatrix[groundTruthImgPixel][predictionImgPixel] += 1
 
 	if args.evalInstLevelScore:
-        # Generate category masks
-        categoryMasks = {}
-        for category in instanceStats["categories"]:
-            categoryMasks[category] = np.in1d( predictionNp , instanceStats["categories"][category]["labelIds"] ).reshape(predictionNp.shape)
+	    # Generate category masks
+	    categoryMasks = {}
+	    for category in instanceStats["categories"]:
+	        categoryMasks[category] = np.in1d( predictionNp , instanceStats["categories"][category]["labelIds"] ).reshape(predictionNp.shape)
 
-        instList = np.unique(instanceNp[instanceNp > 1000])
-        for instId in instList:
-            labelId = int(instId/1000)
-            label = id2label[ labelId ]
-            if label.ignoreInEval:
-                continue
+	    instList = np.unique(instanceNp[instanceNp > 1000])
+	    for instId in instList:
+	        labelId = int(instId/1000)
+	        label = id2label[ labelId ]
+	        if label.ignoreInEval:
+	            continue
 
-            mask = instanceNp==instId
-            instSize = np.count_nonzero( mask )
+	        mask = instanceNp==instId
+	        instSize = np.count_nonzero( mask )
 
-            tp = np.count_nonzero( predictionNp[mask] == labelId )
-            fn = instSize - tp
+	        tp = np.count_nonzero( predictionNp[mask] == labelId )
+	        fn = instSize - tp
 
-            weight = args.avgClassSize[label.name] / float(instSize)
-            tpWeighted = float(tp) * weight
-            fnWeighted = float(fn) * weight
+	        weight = args.avgClassSize[label.name] / float(instSize)
+	        tpWeighted = float(tp) * weight
+	        fnWeighted = float(fn) * weight
 
-            instanceStats["classes"][label.name]["tp"]         += tp
-            instanceStats["classes"][label.name]["fn"]         += fn
-            instanceStats["classes"][label.name]["tpWeighted"] += tpWeighted
-            instanceStats["classes"][label.name]["fnWeighted"] += fnWeighted
+	        instanceStats["classes"][label.name]["tp"]         += tp
+	        instanceStats["classes"][label.name]["fn"]         += fn
+	        instanceStats["classes"][label.name]["tpWeighted"] += tpWeighted
+	        instanceStats["classes"][label.name]["fnWeighted"] += fnWeighted
 
-            category = label.category
-            if category in instanceStats["categories"]:
-                catTp = 0
-                catTp = np.count_nonzero( np.logical_and( mask , categoryMasks[category] ) )
-                catFn = instSize - catTp
+	        category = label.category
+	        if category in instanceStats["categories"]:
+	            catTp = 0
+	            catTp = np.count_nonzero( np.logical_and( mask , categoryMasks[category] ) )
+	            catFn = instSize - catTp
 
-                catTpWeighted = float(catTp) * weight
-                catFnWeighted = float(catFn) * weight
+	            catTpWeighted = float(catTp) * weight
+	            catFnWeighted = float(catFn) * weight
 
-                instanceStats["categories"][category]["tp"]         += catTp
-                instanceStats["categories"][category]["fn"]         += catFn
-                instanceStats["categories"][category]["tpWeighted"] += catTpWeighted
-                instanceStats["categories"][category]["fnWeighted"] += catFnWeighted
+	            instanceStats["categories"][category]["tp"]         += catTp
+	            instanceStats["categories"][category]["fn"]         += catFn
+	            instanceStats["categories"][category]["tpWeighted"] += catTpWeighted
+	            instanceStats["categories"][category]["fnWeighted"] += catFnWeighted
 
 	if args.evalPixelAccuracy:
 		notIgnoredLabels = [l for l in args.evalLabels if not id2label[l].ignoreInEval]
@@ -513,7 +513,7 @@ def evaluatePair(predictionImgFileName, groundTruthImgFileName, confMatrix, inst
 
 def run_eval(resultPath):
 	global args
-
+	
 	args.predictionPath = resultPath
 	predictionImgList = []
 	groundTruthImgList = []
@@ -522,7 +522,7 @@ def run_eval(resultPath):
 	groundTruthImgList = glob.glob(args.groundTruthSearch)
 	if not groundTruthImgList:
 		printError("Cannot find any ground truth images to use for evaluation. Searched for: {}".format(args.groundTruthSearch))
-        # get the corresponding prediction for each ground truth imag
+	    # get the corresponding prediction for each ground truth imag
 	for gt in groundTruthImgList:
 		predictionImgList.append( getPrediction(args, gt) )
 

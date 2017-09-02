@@ -16,11 +16,11 @@ Tail(BN+2convs, rate=12) -> Softmax
 ## Results
 
 - Under development
-- Best accuracy on semantic: ??
+- Best accuracy on semantic: 64.5%(pretrained cityscape)
 - Best accuracy on instance: ??
 - Data set: 2975 training image(1024x2048). 500 val images(not used for training). 1525 test images(without GT) 
 - Data augmentation: Per image standardization, randomly flip, randomly crop? Per epoch randomly shuffle?
-- Training: Train ?? epochs. Batch ??. Adam optimizer(rate=0.001 -> ). L2 weight decay 0.0002.
+- Training: Train ?? epochs. Batch ??. Adam optimizer(rate=0.001 -> ). L2 weight decay 0.0005.
 - Device: Quadro P6000 24GB
 
 ## Acknowledge

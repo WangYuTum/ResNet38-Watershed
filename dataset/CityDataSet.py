@@ -232,14 +232,14 @@ class CityDataSet():
             The standardization procedure used in MXnet implementation.
         '''
         # color scale
-        image *= image
+        image *= (1.0 / 255)
 
         # subtract mean for each channel
         mean = np.array([0.485, 0.456, 0.406]).reshape((1, 1, 3))
         image -= mean
 
         # divide std for each channel
-        std = np.array([0.229, 0.224, 0.225]).reshape((1, 1, 3)))
+        std = np.array([0.229, 0.224, 0.225]).reshape((1, 1, 3))
         image /= std
 
         return image
@@ -300,7 +300,7 @@ class CityDataSet():
         # ../data/CityDatabase/gtFine/{val, test}/frankfurt/fname.png
         fname = img_inx[6]
         fname = fname.split('_')
-        fname = fname[0]+'_'+fname[1]+'_'+fname[2]+'_trainIDs.png'
+        fname = fname[0]+'_'+fname[1]+'_'+fname[2]+'_trainIds.png'
         save_path = os.path.join(self._pred_save_path,fname)
 
         # Reshape to [H,W]
@@ -337,7 +337,7 @@ class CityDataSet():
             # Restore to original image size
             image = np.reshape(image, (H, W))
             output_img = files_img[idx].replace(self._pred_save_path, self._labelIDs_save_path)
-            output_img = output_img.replace('trainIDs', 'labelIDs')
+            output_img = output_img.replace('trainIds', 'labelIds')
 
             imsave(output_img, image)
             print("LabelIDs prediction saved to %s"%output_img)
