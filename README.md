@@ -1,7 +1,6 @@
 # ResNet38-Watershed
 ResNet38 to perform semantic and instance segmentation on Cityscape dataset simultaneously.
 
-This README file is continued to be updated.
 
 ## Implementation
 
@@ -15,11 +14,11 @@ Tail(BN+2convs, rate=12) -> Softmax
 
 ## Results
 
-- Under development
-- Best accuracy on semantic: 64.5%(pretrained cityscape)
+- watershed branch implements unified watershed network.
+- Best accuracy on semantic: ??
 - Best accuracy on instance: ??
 - Data set: 2975 training image(1024x2048). 500 val images(not used for training). 1525 test images(without GT) 
-- Data augmentation: Per image standardization, randomly flip, randomly crop? Per epoch randomly shuffle?
+- Data augmentation: Per image standardization (adapted from MXnet implementation)  randomly crop? Per epoch randomly shuffle?
 - Training: Train ?? epochs. Batch ??. Adam optimizer(rate=0.001 -> ). L2 weight decay 0.0005.
 - Device: Quadro P6000 24GB
 
@@ -28,3 +27,5 @@ Tail(BN+2convs, rate=12) -> Softmax
 Thanks for the GPU provided by [Computer Vision and Pattern Recongnition Group at Technical University Munich](https://vision.in.tum.de/)
 
 ## TODO
+
+- 
