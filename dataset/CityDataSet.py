@@ -18,6 +18,8 @@ from collections import namedtuple
 from scipy.misc import imsave
 from scipy.misc import imread
 from scipy.misc import toimage
+from scipy import sparse
+from scipy.sparse import load_npz
 
 # define a data structure
 Label_City = namedtuple( 'Label' , ['name', 'labelId', 'trainId', 'color',] )
@@ -25,10 +27,10 @@ Label_City = namedtuple( 'Label' , ['name', 'labelId', 'trainId', 'color',] )
 
 class CityDataSet():
     def __init__(self, params):
-        '''mode: 'train', 'val', 'test' '''
-        self._mode = params.get('dataset','train')
+        '''mode: 'train_sem', 'train_dir', 'val', 'test' '''
+        self._mode = params.get('dataset','train_sem')
         self._dir = params.get('data_dir','../data/CityDatabase')
-        self._batch_size = params.get('batch_size', 4)
+        self._batch_size = params.get('batch_size', 1)
 
         self._pred_save_path = params.get('pred_save_path','../data/pred_trainIDs')
         self._colored_save_path = params.get('colored_save_path', '../data/pred_colored')
@@ -80,21 +82,29 @@ class CityDataSet():
         files_img.sort()
 
         # Load GT semantic mask
-        if self._mode == 'train':
+        if self._mode == 'train_sem':
             search_lbl = os.path.join(self._dir,
                                       'gtFine',
                                       self._mode,
                                       '*','*_gtFine_labelTrainIds.png')
             files_lbl = glob.glob(search_lbl)
             files_lbl.sort()
+        # Load GT watershed direction mask
+        if self._mode == 'train_dir':
+            search_lbl = os.path.join(self._dir,
+                                      'gtFine',
+                                      self._mode,
+                                      '*', '*_gtFine_graddir.npz')
+            files_lbl = glob.glob(search_lbl)
+            files_lbl.sort()
 
         self._num_images = int(len(files_img))
         self._num_batches = int(self._num_images / self._batch_size)
 
-        print('Loaded images: {0}, GT semantic mask: {1}'.format(len(files_img), len(files_lbl)))
-        if self._mode == 'Train':
+        print('Loaded images: {0}, GT {1} mask: {2}'.format(len(files_img), self._mode, len(files_lbl)))
+        if self._mode == 'train_sem' or self._mode == 'train_dir':
             if len(files_img) != len(files_lbl):
-                sys.exit('Number of train images and semantic GTs do not match!')
+                sys.exit('Number of train images and GTs do not match!')
         return (files_img, files_lbl)
 
     def next_batch(self):
@@ -102,7 +112,8 @@ class CityDataSet():
         Reshape image and label, extend 1st axis for batch dimension
         Return: (image_batch, label_batch)
                 image_batch: [batch_size, H, W, 3]
-                label_batch: [batch_size, H, W]
+                label_batch: [batch_size, H, W] for semantic label
+                             [batch_size, H, W, 2] for graddir label
         """
 
         batch_idx = self._batch_idx
@@ -136,22 +147,22 @@ class CityDataSet():
             fname = self._img_indices[i]
             image = self._load_image(fname)
             image = image.reshape(1, *image.shape)
-            # Load semantic GT
-            if self._mode == 'train':
+            # Load GT: semantic or graddir
+            if self._mode == 'train_sem' or self._mode == 'train_dir':
                 gt_fname = self._lbl_indices[i]
                 label = self._load_label(gt_fname)
                 label = label.reshape(1, *label.shape)
             if i == start:
                 image_batch = image
-                # Load semantic GT
-                if self._mode == 'train':
+                # Load GT: semantic or graddir
+                if self._mode == 'train_sem' or self._mode == 'train_dir':
                     label_batch = label
             else:
                 image_batch = np.concatenate((image_batch, image))
                 # Load semantic GT
-                if self._mode == 'train':
+                if self._mode == 'train_sem' or self._mode == 'train_dir':
                     label_batch = np.concatenate((label_batch, label))
-        if self._mode != 'train':
+        if self._mode.find("train") == -1:
             label_batch = None
 
         return image_batch, label_batch
@@ -184,16 +195,32 @@ class CityDataSet():
 
     def _load_label(self, fname):
         """
-        Return: [H, W]
+        Return: [H, W] for semantic GT
+                [H, W, 2] for graddir GT
         """
         print('Loading lbl:%s'%fname)
-        try:
-            img = Image.open(fname)
-        except IOError as e:
-            print('Warning: no image with name %s!!'%fname)
-            label = None
-            return label
-        label = np.array(img, dtype=np.uint8)
+        if self._mode == "train_sem":
+            try:
+                img = Image.open(fname)
+            except IOError as e:
+                print('Warning: no image with name %s!!'%fname)
+                label = None
+                return label
+            label = np.array(img, dtype=np.uint8)
+        elif self._mode == "train_dir":
+            try:
+                sparse_grad = load_npz(fname)
+            except IOError as e:
+                print('Warning: no image with name %s!!'%fname)
+                label = None
+                return label
+            grad = sparse_grad.todense()
+            grad = np.array(grad)
+            grad = np.reshape(grad, (1024,2048,3))
+            # Extract the first 2 channels since the last channel is all-zeros
+            label = grad[:,:,:2]
+            if np.shape(label) != (1024,2048,2):
+                sys.exit("Graddir GT shape error: {0}. Expected shape: {1}".format(np.shape(label), (1024,2048,2)))
         return label
 
     def _per_image_standardization(self, image):
