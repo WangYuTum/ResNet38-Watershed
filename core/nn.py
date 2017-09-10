@@ -6,7 +6,7 @@ import tensorflow as tf
 import numpy as np
 
 def ResUnit_downsample_2convs(input_tensor, feed_dict, shape_dict,
-                              var_dict=None, train_flag=None):
+                              var_dict=None):
     '''One of the Residual Block which performs downsampling.'''
 
     if var_dict is not None:
@@ -40,7 +40,7 @@ def ResUnit_downsample_2convs(input_tensor, feed_dict, shape_dict,
 
     return ResUnit_out
 
-def ResUnit_hybrid_dilate_2conv(input_tensor, feed_dict, shape_dict, var_dict, train_flag=None):
+def ResUnit_hybrid_dilate_2conv(input_tensor, feed_dict, shape_dict, var_dict):
     '''The layer for B5_1'''
 
     if var_dict is not None:
@@ -77,7 +77,7 @@ def ResUnit_hybrid_dilate_2conv(input_tensor, feed_dict, shape_dict, var_dict, t
     return ResUnit_out
 
 def ResUnit_full_dilate_2convs(input_tensor, feed_dict, shape_dict,
-                               var_dict=None, train_flag=None):
+                               var_dict=None):
     '''Residul Unit: all convolution layers are dilated. For B5_2, B5_3'''
 
     if var_dict is not None:
@@ -107,7 +107,7 @@ def ResUnit_full_dilate_2convs(input_tensor, feed_dict, shape_dict,
     return ResUnit_out
 
 def ResUnit_hybrid_dilate_3conv(input_tensor, feed_dict, shape_dict, dropout,
-                                var_dict, train_flag=None):
+                                var_dict):
     '''Residual Unit with 3 convolution layers(including 1 dilated conv). For
     B6, B7'''
 
@@ -162,7 +162,7 @@ def ResUnit_hybrid_dilate_3conv(input_tensor, feed_dict, shape_dict, dropout,
 
     return ResUnit_out
 
-def ResUnit_tail(input_tensor, feed_dict, shape_dict, var_dict=None, train_flag=None):
+def ResUnit_tail(input_tensor, feed_dict, shape_dict, var_dict=None):
     '''The ResNet38 Tail for semantic segmantation'''
 
     if var_dict is not None:
@@ -191,7 +191,7 @@ def ResUnit_tail(input_tensor, feed_dict, shape_dict, var_dict=None, train_flag=
         BIAS_out2 = bias_layer(CONV_out2, feed_dict, shape_dict[1][3], var_dict)
     return BIAS_out2
 
-def ResUnit_2convs(input_tensor, feed_dict, shape, var_dict=None, train_flag=None):
+def ResUnit_2convs(input_tensor, feed_dict, shape, var_dict=None):
     '''Standard Residual Unit without downsampling'''
 
     if var_dict is not None:
@@ -219,70 +219,6 @@ def ResUnit_2convs(input_tensor, feed_dict, shape, var_dict=None, train_flag=Non
 
     return ResUnit_out
 
-def grad_convs(input_tensor, feed_dict, shape, var_dict=None, train_flag=None):
-    '''the conv stage for graddir branch'''
-
-    if var_dict is not None:
-        is_train = True
-    else:
-        is_train = False
-
-    # the first batch norm layer
-    BN_out1 = BN(input_tensor=input_tensor, feed_dict=feed_dict,
-                 bn_scope='bn1', is_train=is_train, shape=shape[0][2],
-                 var_dict=var_dict)
-    RELU_out1 = ReLu_layer(BN_out1)
-    # The first conv layer
-    with tf.variable_scope('conv1'):
-        CONV_out1 = conv_layer(RELU_out1, feed_dict, 1, 'SAME', shape[0], var_dict)
-    # The second batch norm layer
-    BN_out2 = BN(CONV_out1, feed_dict, 'bn2', is_train, shape[1][2], var_dict)
-    RELU_out2 = ReLu_layer(BN_out2)
-    # The second conv layer
-    with tf.variable_scope('conv2'):
-        CONV_out2 = conv_layer(RELU_out2, feed_dict, 1, 'SAME', shape[1], var_dict)
-
-    return CONV_out2
-
-def grad_norm(input_tensor, feed_dict, shape, var_dict=None, train_flag=None):
-    '''the grad normalization stage'''
-
-    if var_dict is not None:
-        is_train = True
-    else:
-        is_train = False
-
-    # The only relu layer
-    RELU_out = ReLu_layer(input_tensor)
-    # The first conv layer
-    with tf.variable_scope('conv1'):
-        CONV_out1 = conv_layer(RELU_out, feed_dict, 1, 'SAME', shape[0], var_dict)
-    # The second conv layer
-    with tf.variable_scope('conv2'):
-        CONV_out2 = conv_layer(CONV_out1, feed_dict, 1, 'SAME', shape[1], var_dict)
-    # The third conv layer
-    with tf.variable_scope('conv3'):
-        CONV_out3 = conv_layer(CONV_out2, feed_dict, 1, 'SAME', shape[2], var_dict)
-
-    return CONV_out3
-
-def norm(input_tensor):
-    ''' Normalize the gradddir
-        Input: [1, H, W, 2]'''
-    shape = tf.shape(input_tensor)
-    new_shape = [shape[1], shape[2], shape[3]]
-    vec_mat = tf.reshape(input_tensor, new_shape)
-
-    norm_val = tf.sqrt(tf.reduce_sum(tf.multiply(vec_mat, vec_mat), axis=2))
-    new_shape = [shape[1], shape[2], 1]
-    norm_val = tf.reshape(norm_val, new_shape)
-
-    normed_vec = tf.div(vec_mat, norm_val)
-    new_shape = [shape[0], shape[1], shape[2], shape[3]]
-    normed_vec = tf.reshape(normed_vec, new_shape)
-
-    return normed_vec
-
 def conv_dilate_layer(input_tensor, feed_dict, rate, padding='SAME',
                       shape=None, var_dict=None):
     '''dilated convolution layer using tensorflow atrous_conv2d'''
@@ -301,7 +237,7 @@ def conv_dilate_layer(input_tensor, feed_dict, rate, padding='SAME',
     return conv_out
 
 def conv_layer(input_tensor, feed_dict, stride, padding='SAME', shape=None,
-               var_dict=None, train_flag=None):
+               var_dict=None):
     '''The standard convolution layer'''
 
     scope_name = tf.get_variable_scope().name
@@ -318,7 +254,7 @@ def conv_layer(input_tensor, feed_dict, stride, padding='SAME', shape=None,
     return conv_out
 
 def BN(input_tensor, feed_dict=None, bn_scope=None,is_train=False, shape=None,
-       var_dict=None, train_flag=None):
+       var_dict=None):
     '''Using tensorflow implemented batch norm layer'''
 
     scope_name = tf.get_variable_scope().name
@@ -332,26 +268,8 @@ def BN(input_tensor, feed_dict=None, bn_scope=None,is_train=False, shape=None,
         bn_training = False
         bn_trainable = False
     else:
-        # for all sharable conv layers, freeze all params
-        if scope_name.find('shared'): # shared convs
-            bn_training = False
-            bn_trainable = False
-        elif scope_name.find('semantic'): # sem branch
-            if train_flag['sem_train'] is True:
-                bn_training = False
-                bn_trainable = True
-            else:
-                bn_training = False
-                bn_trainable = False
-        elif scope_name.find('graddir'): # grad branch
-            if train_flag['grad_train'] is True:
-                bn_training = False
-                bn_trainable = True
-            else:
-                bn_training = False
-                bn_trainable = False
-        else:
-            sys.exit('Error: scope_name in BN')
+        bn_training = True
+        bn_trainable = True
 
     BN_out = tf.layers.batch_normalization(inputs=input_tensor,
                                           axis=-1, # default

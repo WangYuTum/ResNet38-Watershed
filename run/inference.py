@@ -29,8 +29,8 @@ num_val = 500
 num_test = 1525
 iterations = num_val
 
-# with tf.Session() as sess:
-with tf.Session(config=config_gpu) as sess:
+with tf.Session() as sess:
+#with tf.Session(config=config_gpu) as sess:
     res38 = resnet38.ResNet38(model_params)
 
     # Feed test/val image, batch=1
@@ -55,8 +55,8 @@ with tf.Session(config=config_gpu) as sess:
         pred_out = sess.run(predict, feed_dict=feed_dict_)
         dataset.save_trainID_img(pred_out)
 
-    print("Inference done! Start transforming to colored ...")
-    dataset.pred_to_color()
+    # print("Inference done! Start transforming to colored ...")
+    # dataset.pred_to_color()
     print("Start transforming to labelIDs ...")
     dataset.pred_to_labelID()
     print("Start evaluating accuracy ...")
