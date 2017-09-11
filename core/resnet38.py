@@ -15,41 +15,23 @@ class ResNet38:
     def __init__(self, params):
 
         ## use pre-trained A1 model on Cityscapes unless specified
-        weight_path = params.get('feed_weight', '../data/trained_weights/pretrained_ResNet38a1_city.npy')
+        weight_path = params.get('feed_weight', '../data/trained_weights/pretrained_ResNet38a1_imgnet.npy')
         self._weight_dict = dt.load_weight(weight_path)
         self._var_dict = {}
 
-        self._train_flag = {}
-        self._train_flag['sem_train'] = False
-        self._train_flag['grad_train'] = False
-
         self._num_classes = params.get('num_classes', 19)
 
-    def _build_model(self, image, is_train=False, sem_train=False, grad_train=False):
+    def _build_model(self, image, sem_gt, is_train=False):
         '''If is_train, save weight to self._var_dict,
            otherwise, don't save weights
-           '''
-        ## NOTE:
-            # This unified network uses sharable ResNet36 conv layers which are freezed.
-            # is_train indicates whether in train or inf mode
-            # sem_train indicates training semantic branch
-            # grad_train indicates training grad branch
-
-        self._train_flag['sem_train'] = sem_train
-        self._train_flag['grad_train'] = grad_train
-
+           image: [1, H, W, 3]
+           sem_gt: [1, H/8, W/8]'''
         model = {}
         feed_dict = self._weight_dict
         if is_train:
             var_dict = self._var_dict
-            if self._train_flag['sem_train'] != self._train_flag['grad_train']:
-                continue
-            else:
-                sys.exit('Error in training mode: sem_train {0}, grad_train {1}'.format(self._train_flag['sem_train'], self._train_flag['grad_train']))
         else:
             var_dict = None
-            self._train_flag['sem_train'] = False
-            self._train_flag['grad_train'] = False
 
         if is_train:
             dropout = True
@@ -59,12 +41,12 @@ class ResNet38:
         shape_dict = {}
         shape_dict['B0'] = [3,3,3,64]
 
-        # The sharable conv features: ?? conv layers
+        # The sharable conv features: 36 conv layers
         with tf.variable_scope('shared'):
             # B0: [H,W,3] -> [H,W,64]
             with tf.variable_scope('B0'):
                 model['B0'] = nn.conv_layer(image, feed_dict, 1, 'SAME',
-                                            shape_dict['B0'], var_dict, self._train_flag)
+                                            shape_dict['B0'], var_dict)
 
             # B2_1: [H,W,64] -> [H/2, W/2, 128]
             shape_dict['B2'] = {}
@@ -74,13 +56,13 @@ class ResNet38:
                 model['B2_1'] = nn.ResUnit_downsample_2convs(model['B0'],
                                                              feed_dict,
                                                              shape_dict['B2'],
-                                                             var_dict=var_dict, train_flag=self._train_flag)
+                                                             var_dict=var_dict)
             # B2_2, B2_3: [H/2, W/2, 128]
             for i in range(2):
                 with tf.variable_scope('B2_'+str(i+2)):
                     model['B2_'+str(i+2)] = nn.ResUnit_2convs(model['B2_'+str(i+1)], feed_dict,
                                                               shape_dict['B2']['convs'][1],
-                                                              var_dict=var_dict, train_flag=self._train_flag)
+                                                              var_dict=var_dict)
 
             # B3_1: [H/2, W/2, 128] -> [H/4, W/4, 256]
             shape_dict['B3'] = {}
@@ -90,13 +72,13 @@ class ResNet38:
                 model['B3_1'] = nn.ResUnit_downsample_2convs(model['B2_3'],
                                                              feed_dict,
                                                              shape_dict['B3'],
-                                                             var_dict=var_dict, train_flag=self._train_flag)
+                                                             var_dict=var_dict)
             # B3_2, B3_3: [H/4, W/4, 256]
             for i in range(2):
                 with tf.variable_scope('B3_'+str(i+2)):
                     model['B3_'+str(i+2)] = nn.ResUnit_2convs(model['B3_'+str(i+1)], feed_dict,
                                                               shape_dict['B3']['convs'][1],
-                                                              var_dict=var_dict, train_flag=self._train_flag)
+                                                              var_dict=var_dict)
             # B4_1: [H/4, W/4, 256] -> [H/8, W/8, 512]
             shape_dict['B4'] = {}
             shape_dict['B4']['side'] = [1,1,256,512]
@@ -105,14 +87,14 @@ class ResNet38:
                 model['B4_1'] = nn.ResUnit_downsample_2convs(model['B3_3'],
                                                                  feed_dict,
                                                                  shape_dict['B4'],
-                                                                 var_dict=var_dict, train_flag=self._train_flag)
+                                                                 var_dict=var_dict)
             # B4_2 ~ B4_6: [H/8, W/8, 512]
             for i in range(5):
                 with tf.variable_scope('B4_'+str(i+2)):
                     model['B4_'+str(i+2)] = nn.ResUnit_2convs(model['B4_'+str(i+1)],
                                                                    feed_dict,
                                                                    shape_dict['B4']['convs'][1],
-                                                                   var_dict=var_dict, train_flag=self._train_flag)
+                                                                   var_dict=var_dict)
             # B5_1: [H/8, W/8, 512] -> [H/8, W/8, 1024]
             shape_dict['B5_1'] = {}
             shape_dict['B5_1']['side'] = [1,1,512,1024]
@@ -121,7 +103,7 @@ class ResNet38:
                 model['B5_1'] = nn.ResUnit_hybrid_dilate_2conv(model['B4_6'],
                                                                    feed_dict,
                                                                    shape_dict['B5_1'],
-                                                                   var_dict=var_dict, train_flag=self._train_flag)
+                                                                   var_dict=var_dict)
             # B5_2, B5_3: [H/8, W/8, 1024]
             # Shape for B5_2, B5_3
             shape_dict['B5_2_3'] = [[3,3,1024,512],[3,3,512,1024]]
@@ -129,7 +111,7 @@ class ResNet38:
                 with tf.variable_scope('B5_'+str(i+2)):
                     model['B5_'+str(i+2)] = nn.ResUnit_full_dilate_2convs(model['B5_'+str(i+1)],
                                                       feed_dict, shape_dict['B5_2_3'],
-                                                      var_dict=var_dict, train_flag=self._train_flag)
+                                                      var_dict=var_dict)
 
             # B6: [H/8, W/8, 1024] -> [H/8, W/8, 2048]
             shape_dict['B6'] = [[1,1,1024,512],[3,3,512,1024],[1,1,1024,2048]]
@@ -138,7 +120,7 @@ class ResNet38:
                                                                  feed_dict,
                                                                  shape_dict['B6'],
                                                                  dropout=dropout,
-                                                                 var_dict=var_dict, train_flag=self._train_flag)
+                                                                 var_dict=var_dict)
             # B7: [H/8, W/8, 2048] -> [H/8, W/8, 4096]
             shape_dict['B7'] = [[1,1,2048,1024],[3,3,1024,2048],[1,1,2048,4096]]
             with tf.variable_scope('B7'):
@@ -146,29 +128,23 @@ class ResNet38:
                                                                  feed_dict,
                                                                  shape_dict['B7'],
                                                                  dropout=dropout,
-                                                                 var_dict=var_dict, train_flag=self._train_flag)
-
-        # The semantic unique part: conv1(+bias1) + conv2(+bias2). Output feature stride=8
-        with tf.variable_scope('semantic'):
-            shape_dict['semantic'] = [[3,3,4096,512],[3,3,512,self._num_classes]]
-            model['semantic'] = nn.ResUnit_tail(model['B7'], feed_dict,
-                                            shape_dict['semantic'], var_dict, train_flag=self._train_flag)
+                                                                 var_dict=var_dict)
 
         # The graddir unique part: conv1 + conv2 + 3*conv3(kernel: [1x1])
-        # Gating operation, need result from semantic branch
-        gated_feat = self._gate(model['semantic'], model['B7'])
+        # Gating operation, need semantic GT
+        gated_feat = self._gate(sem_gt, model['B7'])
 
         with tf.variable_scope("graddir"):
             # The normal feature layers
             shape_dict['grad_convs1'] = [[3,3,4096,512],[3,3,512,512]]
             with tf.variable_scope('convs'):
                 model['grad_convs1'] = nn.grad_convs(gated_feat, feed_dict,
-                                                   shape_dict['grad_convs1'], var_dict, train_flag=self._train_flag)
+                                                   shape_dict['grad_convs1'], var_dict)
             # The norm layers to normalize the output to have same magnitude as grad GT
-            shape_dict['grad_convs2'] = [[1,1,512,256],[1,1,256,128],[1,1,128,2]]
+            shape_dict['grad_convs2'] = [[1,1,512,256],[1,1,256,256],[1,1,256,2]]
             with tf.variable_scope('norm'):
                 model['grad_convs2'] = nn.grad_norm(model['grad_convs1'], feed_fict,
-                                                 shape_dict['grad_convs2'], var_dicti, train_flag=self._train_flag)
+                                                 shape_dict['grad_convs2'], var_dict)
             # Normalize the output to have unit vectors
             model['grad_norm'] = nn.norm(model['grad_convs2'])
 
@@ -178,11 +154,10 @@ class ResNet38:
         ''' This function takes inputs as semantic result and feature maps,
             returns gated feature maps, where non-relevant classes on the
             feature maps are set to zero
-            Input: sem_input [1, H, W, 19]
+            Input: sem_input [1, H, W]
                    feat_input [1, H, W, 4096]
             Output: gated feature maps [1, H, W, 4096]'''
 
-        sem_out = tf.argmax(tf.nn.softmax(sem_input), axis=3)
         # TODO: Only gate class car, car label
         sem_bool = tf.equal(sem_out, 13)
         sem_bin = tf.cast(sem_bool, tf.float32)
@@ -218,82 +193,36 @@ class ResNet38:
 
         return np.sum([np.product([xi.value for xi in x.get_shape()]) for x in tf.trainable_variables()])
 
-    ## TODO
-    def train(self, image, label, params):
-        '''Input: Image [batch_size, H, W, C]
-                  Label [batch_size]
-                  params: 'num_class', 'batch_size', 'decay_rate' '''
+        # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # with tf.control_dependencies(update_ops):
+             # default learning rate for Adam: 0.001
+            # train_op = tf.train.AdamOptimizer().minimize(total_loss)
 
-        # Here padding to 36x36 then randomly crop per image.
-        padded_img = tf.image.resize_image_with_crop_or_pad(image, 36, 36)
-        cropped_img = tf.random_crop(padded_img, [params['batch_size'], 32, 32,3])
-        # padding and cropping end
-
-        # Here randomly flip each image
-        flipped_img = tf.map_fn(lambda img: tf.image.random_flip_left_right(img), cropped_img)
-        # randomly flipping end
-
-        model = self._build_model(flipped_img, is_train=True)
-        prediction = model['fc_out']
-        label = tf.reshape(label, [params['batch_size']])
-
-        # compute train accuracy
-        pred_label = tf.argmax(tf.nn.softmax(prediction), axis=1)
-        correct_pred_bools = tf.equal(pred_label, label)
-        correct_preds = tf.reduce_sum(tf.cast(correct_pred_bools, tf.float32))
-        train_acc = correct_preds/params['batch_size']
-        entropy_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label,
-                                                                      logits=prediction))
-        total_loss = entropy_loss + self._weight_decay(params['decay_rate'])
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            # default learning rate for Adam: 0.001
-            train_op = tf.train.AdamOptimizer().minimize(total_loss)
-
-        return train_op, total_loss, train_acc, correct_preds
-
-    def train_sem(self, image, label, params):
-        ''' This function only trains semantic branch.
-            Input: Image [1, H, W, 3]
-                   Label [1, H*W]
-                   params: decay_rate, lr
-        '''
-        # NOTE: train on downsampled results 
-
-        model = self._build_model(image, is_train=True, sem_train=True, grad_train=False)
-        pred = model['semantic']
-
-        old_shape = tf.shape(pred)
-        new_shape = [old_shape[0], old_shape[1]*old_shape[2], self._num_classes]
-        pred = tf.reshape(pred, new_shape)
-
-        # TODO: check void label number
-        void_bool = tf.equal(label, 19)
-        valid_bool = tf.logical_not(void_bool)
-        valid_label = tf.boolean_mask(label, valid_bool)
-        valid_pred = tf.boolean_mask(pred, valid_bool)
-
-        loss_sem = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_label, logits=valid_pred))
-        loss_total = loss_sem + self._weight_decay(params['decay_rate'])
-        # Don't update BN parameters, use normal optimizer
-        train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
-
-        return train_step, loss_total
-
-    def train_grad(self, image, label, params):
+    def train_grad(self, image, sem_gt, label, params):
         '''This function only trains graddir branch.
-            Input: Image [1, H, W, 3]
-                   Label [1, H, W, 2]
+            Input: image [1, H, W, 3]
+                   sem_gt [1, H, W], need to be downsample by 8
+                   label [1, H, W, 2], the graddir
                    params: decay_rate, lr
         '''
         # NOTE: train on downsampled results
 
-        model = self._build_model(image, is_train=True, sem_train=False, grad_train=True)
+        ## downsample sem_gt by 8
+        sem_shape = tf.shape(sem_gt)
+        new_size = [sem_shape[1]/8, sem_shape[2]/8]
+        new_size = tf.cast(new_size, tf.int32)
+        sem_gt = tf.reshape(sem_gt, [sem_shape[0], sem_shape[1], sem_shape[2], 1])
+        sem_gt = tf.image.resize_images(sem_gt, new_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        sem_gt = tf.squeeze(sem_gt, axis=0)
+
+        model = self._build_model(image, sem_gt, is_train=True)
         pred = model['grad_norm']
 
+        ## downsample graddir label by 8
         # remove the first dim
         pred = tf.squeeze(pred)
         label = tf.squeeze(label)
+        label = tf.image.resize_images(label, new_size)
 
         # The predicted graddir and GT are already normalized
         product = tf.reduce_sum(tf.multiply(pred,label), axis=2)
@@ -301,41 +230,21 @@ class ResNet38:
         loss_grad = tf.square(tf.norm(cos_out))
         loss_total = loss_grad + self._weight_decay(params['decay_rate'])
 
-        # Don't update BN parameters, use normal optimizer
-        train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
 
         return train_step, loss_total
 
+    def inf(self, image, sem_gt):
+        ''' Input: image [1, H, W, C]
+                   sem_gt [1, H, W]
+            Output: upsampled graddir result [1, 1024, 2048, 2]'''
 
-    def inf_grad(self, image):
-        ''' Input: Image [1, H, W, C]
-            Output: upsampled semantic result [1, 1024, 2048]
-                    upsampled graddir result [1, 1024, 2048, 2]'''
+        model = self._build_model(image, sem_gt, is_train=False)
+        pred = model['grad_norm']
+        pred = self._upsample(pred, [1024,2048])
 
-        model = self._build_model(image, is_train=False)
-        pred_sem = model['semantic']
-        pred_grad = model['grad_norm']
-        upsampled_sem = self._upsample(pred_sem, [1024,2048])
-        upsampled_grad = self._upsample(pred_grad, [1024,2048])
-
-        ## Predict class label: [batch, H, W, C]
-        pred_sem_label = tf.argmax(tf.nn.softmax(upsampled_sem), axis=3)
-
-        return pred_sem_label, upsampled_grad
-
-    def inf_semantic(self, image):
-        ''' Input: Image [1, H, W, C]
-            Output: upsampled pred [1, 1024, 2048, 1]
-            Note that it only produce semantic output.'''
-
-        model = self._build_model(image, is_train=False)
-        pred = model['semantic']
-        upsampled_pred = self._upsample(pred, [1024,2048])
-
-        ## Predict class label: [batch, H, W, C]
-        pred_label = tf.argmax(tf.nn.softmax(upsampled_pred), axis=3)
-
-        return pred_label
-
+        return pred
 
 

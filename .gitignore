@@ -13,6 +13,8 @@
 *.ipynb
 dataset/*.ipynb
 dataset/*.npz
+dataset/*.npy
+dataset/*.params
 
 # Any folders
 data/
