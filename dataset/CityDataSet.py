@@ -133,7 +133,9 @@ class CityDataSet():
         else:
             # At the boundary
             if self._num_images % self._batch_size == 0:
-                pass
+                # restart from beginning
+                image_batch, label_batch = self._get_batch(0, self._batch_size)
+                self._batch_idx = 1
             else:
                 # The first part
                 first_image_batch, first_label_batch = _get_batch(batch_idx*self._batch_size, total_images)
@@ -142,7 +144,7 @@ class CityDataSet():
                 image_batch = np.concatenate((first_image_batch, second_image_batch))
                 if (first_label_batch is not None) and (second_label_batch is not None):
                     label_batch = np.concatenate((first_label_batch, second_label_batch))
-            self._batch_idx = 0
+                self._batch_idx = 0
 
         return (image_batch,label_batch)
 
