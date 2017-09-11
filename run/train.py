@@ -25,7 +25,7 @@ model_params = {'num_classes': 19,
                 'tsboard_save_path': '../data/tsboard/'}
 
 train_ep = 31
-save_ep = 5
+save_ep = 3
 num_train = 2975
 
 with tf.Session() as sess:
@@ -60,7 +60,7 @@ with tf.Session() as sess:
         if epoch % save_ep == 0 and epoch !=0:
             print('Save trained weight after epoch: %d'%epoch)
             save_npy = sess.run(save_dict_op)
-            save_path = params['save_path']
+            save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
                 save_name = 'watershed_precitya1_sem8s_upsta_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
