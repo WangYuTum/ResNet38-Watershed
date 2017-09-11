@@ -207,11 +207,21 @@ class ResNet38:
         '''
         # NOTE: train on downsampled results
 
+        ## resize inputs: image, sem_gt and label because of out of memory on 12GB TitanX
+        # Resize from [1024, 2048] to [512, 1024]
+        full_size = tf.shape(image)
+        small_size = [full_size[1], full_size[2]]
+        small_size = tf.cast(small_size, tf.int32)
+        image = tf.image.resize_images(image, small_size)
+        label = tf.image.resize_images(label, small_size)
+        sem_gt = tf.reshape(sem_gt, [1, full_size[1], full_size[2], 1])
+        sem_gt = tf.image.resize_images(sem_gt, small_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+
         ## downsample sem_gt by 8
         sem_shape = tf.shape(sem_gt)
         new_size = [sem_shape[1]/8, sem_shape[2]/8]
         new_size = tf.cast(new_size, tf.int32)
-        sem_gt = tf.reshape(sem_gt, [sem_shape[0], sem_shape[1], sem_shape[2], 1])
+        # sem_gt = tf.reshape(sem_gt, [sem_shape[0], sem_shape[1], sem_shape[2], 1])
         sem_gt = tf.image.resize_images(sem_gt, new_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         sem_gt = tf.squeeze(sem_gt, axis=0)
 
