@@ -164,47 +164,36 @@ class ResNet38:
 
         return np.sum([np.product([xi.value for xi in x.get_shape()]) for x in tf.trainable_variables()])
 
-    ## TODO
-    def train(self, image, label, params):
-        '''Input: Image [batch_size, H, W, C]
-                  Label [batch_size]
-                  params: 'num_class', 'batch_size', 'decay_rate' '''
-
-        # Here padding to 36x36 then randomly crop per image.
-        padded_img = tf.image.resize_image_with_crop_or_pad(image, 36, 36)
-        cropped_img = tf.random_crop(padded_img, [params['batch_size'], 32, 32,3])
-        # padding and cropping end
-
-        # Here randomly flip each image
-        flipped_img = tf.map_fn(lambda img: tf.image.random_flip_left_right(img), cropped_img)
-        # randomly flipping end
-
-        model = self._build_model(flipped_img, is_train=True)
-        prediction = model['fc_out']
-        label = tf.reshape(label, [params['batch_size']])
-
-        # compute train accuracy
-        pred_label = tf.argmax(tf.nn.softmax(prediction), axis=1)
-        correct_pred_bools = tf.equal(pred_label, label)
-        correct_preds = tf.reduce_sum(tf.cast(correct_pred_bools, tf.float32))
-        train_acc = correct_preds/params['batch_size']
-        entropy_loss = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=label,
-                                                                      logits=prediction))
-        total_loss = entropy_loss + self._weight_decay(params['decay_rate'])
-        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
-        with tf.control_dependencies(update_ops):
-            # default learning rate for Adam: 0.001
-            train_op = tf.train.AdamOptimizer().minimize(total_loss)
-
-        return train_op, total_loss, train_acc, correct_preds
+        # flipped_img = tf.map_fn(lambda img: tf.image.random_flip_left_right(img), cropped_img)
+        # update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        # with tf.control_dependencies(update_ops):
+             # default learning rate for Adam: 0.001
+             # train_op = tf.train.AdamOptimizer().minimize(total_loss)
 
     def train_sem(self, image, label, params):
         ''' This function only trains semantic branch.
             Input: Image [1, H, W, 3]
-                   Label [1, H*W]
+                   Label [1, H, W]
                    params: decay_rate, lr
         '''
         # NOTE: train on downsampled results 
+
+        ## Randomly resize the image/label in range [0.7, 1.3], then randomly crop [504,504]
+        old_shape = tf.shape(label)
+        new_shape = [old_shape[0], old_shape[1], old_shape[2], 1]
+        label = tf.reshape(label, new_shape)
+        stacked = tf.concat([image, label], axis=0)
+        # randomly resize [0.7, 1.3]
+        (rand_H, rand_W) = np.random.randint(7,13,2)
+        new_size = [ (old_shape[1] * rand_H / 10).astype(np.int16), (old_shape[2] * rand_W / 10).astype(np.int16)]
+        stacked = tf.image.resize_images(stacked, new_size)
+        # randomly crop and flip
+        stacked = tf.random_crop(stacked, [old_shape[0], 504, 504, 4])
+        stacked = tf.squeeze(stacked)
+        stacked = tf.image.random_flip_left_right(stacked)
+        stacked = tf.reshape(stacked, [old_shape[0], 504, 504, 4])
+        image = stacked[:, :, :, :3]
+        label = stacked[:, :, :, 3:]
 
         model = self._build_model(image, is_train=True, sem_train=True, grad_train=False)
         pred = model['semantic']
@@ -213,6 +202,10 @@ class ResNet38:
         new_shape = [old_shape[0], old_shape[1]*old_shape[2], self._num_classes]
         pred = tf.reshape(pred, new_shape)
 
+        # TODO resize label to [1, H/8, W/8], then strech to a vector [1, H/8 * W/8]
+        new_size = [old_shape[1]/8, old_shape[2]/8]
+        label = tf.image.resize_images(label, new_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        new_shape = [old_shape[0], new_size[0]*new_size[1]]
         # NOTE: the void number is 19, car is 13
         void_bool = tf.equal(label, 19)
         valid_bool = tf.logical_not(void_bool)

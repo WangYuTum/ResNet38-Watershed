@@ -268,7 +268,7 @@ def BN(input_tensor, feed_dict=None, bn_scope=None,is_train=False, shape=None,
         bn_training = False
         bn_trainable = False
     else:
-        bn_training = True
+        bn_training = False #NOTE: use global moving mean/var but not update them in sem train
         bn_trainable = True
 
     BN_out = tf.layers.batch_normalization(inputs=input_tensor,
