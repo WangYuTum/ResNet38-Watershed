@@ -143,7 +143,7 @@ class ResNet38:
             # The norm layers to normalize the output to have same magnitude as grad GT
             shape_dict['grad_convs2'] = [[1,1,512,256],[1,1,256,256],[1,1,256,2]]
             with tf.variable_scope('norm'):
-                model['grad_convs2'] = nn.grad_norm(model['grad_convs1'], feed_fict,
+                model['grad_convs2'] = nn.grad_norm(model['grad_convs1'], feed_dict,
                                                  shape_dict['grad_convs2'], var_dict)
             # Normalize the output to have unit vectors
             model['grad_norm'] = nn.norm(model['grad_convs2'])
@@ -159,7 +159,7 @@ class ResNet38:
             Output: gated feature maps [1, H, W, 4096]'''
 
         # TODO: Only gate class car, car label
-        sem_bool = tf.equal(sem_out, 13)
+        sem_bool = tf.equal(sem_input, 13)
         sem_bin = tf.cast(sem_bool, tf.float32)
 
         gated_feat = tf.multiply(feat_input, sem_bin)

@@ -106,7 +106,7 @@ class CityDataSet():
         self._num_images = int(len(files_img))
         self._num_batches = int(self._num_images / self._batch_size)
 
-        print('Loaded images: {0}, GT {1}, semantic_GT: {2}, graddir_GT: {3}'.format(len(files_img), self._mode, len(files_sem), len(files_dir)))
+        print('Loaded images: {0}, Mode: {1}, semantic_GT: {2}, graddir_GT: {3}'.format(len(files_img), self._mode, len(files_sem), len(files_dir)))
         if self._mode == 'train_sem' or self._mode == 'train_dir':
             if len(files_img) != len(files_sem):
                 sys.exit('Number of train images and semantic_GTs do not match!')
@@ -225,7 +225,7 @@ class CityDataSet():
                 None for graddir GT if self._mode is 'train_sem'
         """
         print('Loading sem_gt:%s'%sem_fname)
-        if (dir_name is not None) and (self._mode == 'train_dir'):
+        if (dir_fname is not None) and (self._mode == 'train_dir'):
             print('Loading dir_gt:%s'%dir_fname)
         if self._mode == "train_sem" or self._mode == "train_dir":
             try:

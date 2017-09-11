@@ -40,7 +40,7 @@ with tf.Session() as sess:
     save_dict_op = res38._var_dict
     TrainLoss_sum = tf.summary.scalar('train_loss', loss)
     Train_summary = tf.summary.merge_all()
-    writer = tf.summary.FileWriter(params['tsboard_save_path']+'grad', sess.graph)
+    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'grad_upsta', sess.graph)
     init = tf.global_variables_initializer()
     sess.run(init)
 
