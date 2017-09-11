@@ -218,7 +218,9 @@ class ResNet38:
         loss_sem = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_label, logits=valid_pred))
         loss_total = loss_sem + self._weight_decay(params['decay_rate'])
         # NOTE: don't update BN moving mean and moving var, however train BN gamma and beta
-        train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
 
         return train_step, loss_total
 
