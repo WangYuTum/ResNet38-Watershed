@@ -9,7 +9,7 @@ import tensorflow as tf
 import data_utils as dt
 from core import resnet38
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 train_data_params = {'data_dir': '../data/CityDatabase',
                      'dataset': 'train_sem',
                      'batch_size': 1}
@@ -33,12 +33,12 @@ with tf.Session() as sess:
     save_path = model_params['save_path']
     batch_size = model_params['batch_size']
 
-    train_img = tf.placeholder(tf.float32, shape=[batch_size, None, None, 3])
-    train_label = tf.placeholder(tf.int32, shape=[batch_size, None, None])
+    train_img = tf.placeholder(tf.float32, shape=[batch_size, 1024, 2048, 3])
+    train_label = tf.placeholder(tf.int32, shape=[batch_size, 1024, 2048, 3])
     [train_op, loss] = res38.train_sem(image=train_img, label=train_label, params=model_params)
 
     save_dict_op = res38._var_dict
-    TrainLoss_sum = tf.summary.scalar('train_loss', total_loss)
+    TrainLoss_sum = tf.summary.scalar('train_loss', loss)
     Train_summary = tf.summary.merge_all()
     writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'semantic', sess.graph)
     init = tf.global_variables_initializer()
@@ -50,6 +50,8 @@ with tf.Session() as sess:
         print('Eopch %d'%epoch)
         for iters in range(num_iters):
             next_images, next_labels = dataset.next_batch() # images [batch_size,H,W,3], labels [batch_size,H,W]
+            # stack labels to [batch_size, H, W, 3] for further processing in train_sem
+            next_labels = np.stack((next_labels, np.zeros((batch_size,1024,2048),np.uint8), np.zeros((batch_size,1024,2048),np.uint8)),axis=-1)
             train_feed_dict = {train_img: next_images, train_label: next_labels}
             [train_op_, loss_, Train_summary_] = sess.run([train_op, loss, Train_summary], train_feed_dict)
             writer.add_summary(Train_summary_, iters)

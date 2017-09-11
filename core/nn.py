@@ -17,7 +17,7 @@ def ResUnit_downsample_2convs(input_tensor, feed_dict, shape_dict,
     # The first bath norm layer
     BN_out1 = BN(input_tensor=input_tensor, feed_dict=feed_dict,
                  bn_scope='bn1', is_train=is_train, shape=shape_dict['convs'][0][2],
-                 var_dict=var_dict, train_flag=train_flag)
+                 var_dict=var_dict)
     RELU_out1 = ReLu_layer(BN_out1)
 
     # The shortcut convolution layer, using stride=2 to perform downsample
@@ -268,7 +268,7 @@ def BN(input_tensor, feed_dict=None, bn_scope=None,is_train=False, shape=None,
         bn_training = False
         bn_trainable = False
     else:
-        bn_training = False #NOTE: use global moving mean/var but not update them in sem train
+        bn_training = True #NOTE: use global moving mean/var but not update them in sem train
         bn_trainable = True
 
     BN_out = tf.layers.batch_normalization(inputs=input_tensor,

@@ -75,9 +75,14 @@ class CityDataSet():
         files_lbl = []
 
         # Load train/val/test RGB images
+        mode = 'train'
+        if self._mode.find('train') != -1:
+            mode = 'train'
+        else:
+            mode = self._mode
         search_img = os.path.join(self._dir,
                                   'leftImg8bit',
-                                  self._mode,'*','*_leftImg8bit.png')
+                                  mode,'*','*_leftImg8bit.png')
         files_img = glob.glob(search_img)
         files_img.sort()
 
@@ -85,7 +90,7 @@ class CityDataSet():
         if self._mode == 'train_sem':
             search_lbl = os.path.join(self._dir,
                                       'gtFine',
-                                      self._mode,
+                                      'train',
                                       '*','*_gtFine_labelTrainIds.png')
             files_lbl = glob.glob(search_lbl)
             files_lbl.sort()
@@ -93,7 +98,7 @@ class CityDataSet():
         if self._mode == 'train_dir':
             search_lbl = os.path.join(self._dir,
                                       'gtFine',
-                                      self._mode,
+                                      'train',
                                       '*', '*_gtFine_graddir.npz')
             files_lbl = glob.glob(search_lbl)
             files_lbl.sort()
@@ -173,7 +178,7 @@ class CityDataSet():
         Cast to np.float32
         Return: [H, W, 3]
         """
-        print('Loading img:%s'%fname)
+        # print('Loading img:%s'%fname)
         try:
             img = Image.open(fname)
         except IOError as e:
@@ -198,7 +203,7 @@ class CityDataSet():
         Return: [H, W] for semantic GT
                 [H, W, 2] for graddir GT
         """
-        print('Loading lbl:%s'%fname)
+        # print('Loading lbl:%s'%fname)
         if self._mode == "train_sem":
             try:
                 img = Image.open(fname)
