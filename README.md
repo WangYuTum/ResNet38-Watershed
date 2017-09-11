@@ -19,7 +19,7 @@ Semantic(BN+2convs, rate=12) -> Softmax
 - Best accuracy on semantic: ??
 - Data set: 2975 training image(1024x2048). 500 val images(not used for training). 1525 test images(without GT) 
 - Data augmentation: Per image standardization (adapted from MXnet implementation). Randomly crop per image. Per epoch randomly shuffle?
-- Training: Train ?? epochs. Batch ??. Adam optimizer(rate=0.001 -> ). L2 weight decay 0.0005.
+- Training: Train 30 epochs. Batch 1. Adam optimizer(rate=0.001). L2 weight decay 0.0005.
 - Device: TitanX(Pascal) 12GB
 
 ## Acknowledge
@@ -27,3 +27,8 @@ Semantic(BN+2convs, rate=12) -> Softmax
 Thanks for the GPU provided by [Computer Vision and Pattern Recongnition Group at Technical University Munich](https://vision.in.tum.de/)
 
 ## TODO
+
+- BN: use multi-batch!
+- BN: train using moving statistic or batch statistic?
+- BN: train update moving statistic or not? update gamma/beta or not?
+
