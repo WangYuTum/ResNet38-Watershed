@@ -9,7 +9,7 @@ import tensorflow as tf
 import data_utils as dt
 from core import resnet38
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 train_data_params = {'data_dir': '../data/CityDatabase',
                      'dataset': 'train_dir',
                      'batch_size': 1}
@@ -53,7 +53,7 @@ with tf.Session() as sess:
             train_feed_dict = {train_img: next_images, train_sem_gt: next_sem_gt, train_label: next_labels}
             [train_op_, loss_, Train_summary_, loss_grad_, cos_out_, product_] = sess.run([train_op, loss, Train_summary, loss_grad, cos_out, product], train_feed_dict)
             writer.add_summary(Train_summary_, iters)
-            if iters % 10 == 0 and iters !=0:
+            if iters % 1 == 0 and iters !=0:
                 print('Iter {0} loss: {1}'.format(iters, loss_))
                 print("loss_grad: {0}".format(loss_grad_))
                 print("cos_out_: {0}".format(cos_out_))

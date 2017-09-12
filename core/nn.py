@@ -274,6 +274,9 @@ def norm(input_tensor):
     vec_mat = tf.reshape(input_tensor, new_shape)
 
     norm_val = tf.sqrt(tf.reduce_sum(tf.multiply(vec_mat, vec_mat), axis=2))
+    zero_bool = tf.equal(norm_val,0)
+    one_mat = tf.cast(zero_bool, tf.float32)
+    norm_val = tf.add(norm_val, one_mat)
     new_shape = [shape[1], shape[2], 1]
     norm_val = tf.reshape(norm_val, new_shape)
 
