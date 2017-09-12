@@ -9,7 +9,7 @@ import tensorflow as tf
 import data_utils as dt
 from core import resnet38
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 train_data_params = {'data_dir': '../data/CityDatabase',
                      'dataset': 'train_sem',
                      'batch_size': 1}
@@ -17,7 +17,7 @@ dataset = dt.CityDataSet(train_data_params)
 
 ## NOTE learning rate, optimizer
 model_params = {'num_classes': 19,
-                'feed_path': 'data/trained_weights/pretrained_ResNet38a1_city.npy',
+                'feed_weight': '../data/trained_weights/pretrained_ResNet38a1_city.npy',
                 'batch_size': 1,
                 'decay_rate': 0.0005,
                 'lr': 0.001,
@@ -25,7 +25,7 @@ model_params = {'num_classes': 19,
                 'tsboard_save_path': '../data/tsboard/'}
 
 train_ep = 31
-save_ep = 5
+save_ep = 1
 num_train = 2975
 
 with tf.Session() as sess:

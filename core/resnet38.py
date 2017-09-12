@@ -185,7 +185,7 @@ class ResNet38:
         new_size = [ tf.cast(input_shape[1] * rand_H / 10, tf.int32), tf.cast(input_shape[2] * rand_W / 10, tf.int32) ]
         label = tf.image.resize_images(label, new_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         image = tf.image.resize_images(image, new_size, tf.image.ResizeMethod.BILINEAR)
-        image = tf.cast(image, tf.int32)
+        label = tf.cast(label, tf.float32) #NOTE, image is already normalized, cannot be converted to tf.int32
         stacked = tf.concat([image, label], axis=-1)
         # randomly crop and flip
         stacked = tf.random_crop(stacked, [input_shape[0], 504, 504, 6])
@@ -193,22 +193,23 @@ class ResNet38:
         stacked = tf.image.random_flip_left_right(stacked)
         stacked = tf.reshape(stacked, [input_shape[0], 504, 504, 6])
         image = stacked[:, :, :, :3]
-        image = tf.cast(image, tf.float32)
         label = stacked[:, :, :, 3:4]
+        label = tf.cast(label, tf.int32) #NOTE, [1,504,504,1]
 
         model = self._build_model(image, is_train=True)
-        pred = model['semantic']
+        pred = model['semantic'] #NOTE, pred is [1, 63,63,19]
 
-        old_shape = tf.shape(pred)
-        new_shape = [old_shape[0], old_shape[1]*old_shape[2], self._num_classes]
+        pre_shape = tf.shape(pred) #NOTE, [1,63,63,19]
+        new_shape = [pre_shape[0], pre_shape[1]*pre_shape[2], self._num_classes]
         pred = tf.reshape(pred, new_shape)
 
         # resize label to [1, H/8, W/8], then strech to a vector [1, H/8 * W/8]
-        new_size = [old_shape[1]/8, old_shape[2]/8]
+        #new_size = [old_shape[1]/8, old_shape[2]/8]
+        new_size = [pre_shape[1], pre_shape[2]]
         new_size = tf.cast(new_size, tf.int32)
         label = tf.image.resize_images(label, new_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        new_shape = [old_shape[0], new_size[0]*new_size[1]]
-        label = tf.reshape(label, new_shape)
+        new_shape = [pre_shape[0], new_size[0]*new_size[1]]
+        label = tf.reshape(label, new_shape) #NOTE, lable is [1, 63*63]
         # NOTE: the void number is 19, car is 13
         void_bool = tf.equal(label, 19)
         valid_bool = tf.logical_not(void_bool)
