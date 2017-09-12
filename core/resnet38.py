@@ -209,12 +209,13 @@ class ResNet38:
 
         ## resize inputs: image, sem_gt and label because of out of memory on 12GB TitanX
         # Resize from [1024, 2048] to [512, 1024]
-        full_size = tf.shape(image)
-        small_size = [full_size[1], full_size[2]]
+        # full_size = tf.shape(image)
+        full_size = [1024,2048]
+        small_size = [full_size[0]/2, full_size[1]/2]
         small_size = tf.cast(small_size, tf.int32)
         image = tf.image.resize_images(image, small_size)
         label = tf.image.resize_images(label, small_size)
-        sem_gt = tf.reshape(sem_gt, [1, full_size[1], full_size[2], 1])
+        sem_gt = tf.reshape(sem_gt, [1, full_size[0], full_size[1], 1])
         sem_gt = tf.image.resize_images(sem_gt, small_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
         ## downsample sem_gt by 8
@@ -235,6 +236,7 @@ class ResNet38:
         label = tf.image.resize_images(label, new_size)
 
         # The predicted graddir and GT are already normalized
+        # TODO: product is nan!
         product = tf.reduce_sum(tf.multiply(pred,label), axis=2)
         cos_out = tf.acos(product)
         loss_grad = tf.square(tf.norm(cos_out))
@@ -244,7 +246,7 @@ class ResNet38:
         with tf.control_dependencies(update_ops):
             train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
 
-        return train_step, loss_total
+        return train_step, loss_total, product, loss_grad, cos_out
 
     def inf(self, image, sem_gt):
         ''' Input: image [1, H, W, C]

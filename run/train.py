@@ -35,7 +35,7 @@ with tf.Session() as sess:
     train_img = tf.placeholder(tf.float32, shape=[batch_size, 1024, 2048, 3])
     train_sem_gt = tf.placeholder(tf.int32, shape=[batch_size, 1024, 2048])
     train_label = tf.placeholder(tf.float32, shape=[batch_size, 1024, 2048, 2])
-    [train_op, loss] = res38.train_grad(image=train_img, sem_gt=train_sem_gt, label=train_label, params=model_params)
+    [train_op, loss, product, loss_grad, cos_out] = res38.train_grad(image=train_img, sem_gt=train_sem_gt, label=train_label, params=model_params)
 
     save_dict_op = res38._var_dict
     TrainLoss_sum = tf.summary.scalar('train_loss', loss)
@@ -51,10 +51,13 @@ with tf.Session() as sess:
         for iters in range(num_iters):
             next_images, next_sem_gt, next_labels = dataset.next_batch() # images [batch_size,H,W,3], sem_gt [batch_size,H,W], labels [batch_size,H,W,2]
             train_feed_dict = {train_img: next_images, train_sem_gt: next_sem_gt, train_label: next_labels}
-            [train_op_, loss_, Train_summary_] = sess.run([train_op, loss, Train_summary], train_feed_dict)
+            [train_op_, loss_, Train_summary_, loss_grad_, cos_out_, product_] = sess.run([train_op, loss, Train_summary, loss_grad, cos_out, product], train_feed_dict)
             writer.add_summary(Train_summary_, iters)
             if iters % 10 == 0 and iters !=0:
                 print('Iter {0} loss: {1}'.format(iters, loss_))
+                print("loss_grad: {0}".format(loss_grad_))
+                print("cos_out_: {0}".format(cos_out_))
+                print("product_: {0}".format(product_))
         if epoch % save_ep == 0 and epoch !=0:
             print('Save trained weight after epoch: %d'%epoch)
             save_npy = sess.run(save_dict_op)
