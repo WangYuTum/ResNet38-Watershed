@@ -10,7 +10,7 @@ import data_utils as dt
 from core import resnet38
 from eval import evalPixelSemantic
 
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 config_gpu = tf.ConfigProto()
 config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.9
 
@@ -24,10 +24,10 @@ test_data_params = {'data_dir': '../data/CityDatabase',
 dataset = dt.CityDataSet(test_data_params)
 
 model_params = {'num_classes': 19,
-                'feed_path': 'data/trained_weights/pretrained_ResNet38a1_city.npy'}
+                'feed_weight': '../data/saved_weights/watershed_precitya1_sem8s_upsta_ep3.npy'}
 num_val = 500
 num_test = 1525
-iterations = num_val
+iterations = 4
 
 with tf.Session() as sess:
 #with tf.Session(config=config_gpu) as sess:
@@ -55,11 +55,11 @@ with tf.Session() as sess:
         pred_out = sess.run(predict, feed_dict=feed_dict_)
         dataset.save_trainID_img(pred_out)
 
-    # print("Inference done! Start transforming to colored ...")
-    # dataset.pred_to_color()
-    print("Start transforming to labelIDs ...")
-    dataset.pred_to_labelID()
-    print("Start evaluating accuracy ...")
-    accuracy = evalPixelSemantic.run_eval(test_data_params['labelIDs_save_path'])
-    print("Final score {}".format(accuracy))
+    print("Inference done! Start transforming to colored ...")
+    dataset.pred_to_color()
+    # print("Start transforming to labelIDs ...")
+    # dataset.pred_to_labelID()
+    # print("Start evaluating accuracy ...")
+    # accuracy = evalPixelSemantic.run_eval(test_data_params['labelIDs_save_path'])
+    # print("Final score {}".format(accuracy))
 

@@ -32,3 +32,8 @@ Thanks for the GPU provided by [Computer Vision and Pattern Recongnition Group a
 - BN: train using moving statistic or batch statistic?
 - BN: train update moving statistic or not? update gamma/beta or not?
 
+## NOTES
+
+- train using local batch statistic, update moving statistic, Adam(lr=0.001, 15 epoch) -> ??
+- train using local batch statistic, no update moving statistic, Adam(lr=0.001, 15 epoch) -> ??
+
