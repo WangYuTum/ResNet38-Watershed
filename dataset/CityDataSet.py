@@ -198,7 +198,7 @@ class CityDataSet():
         Cast to np.float32
         Return: [H, W, 3]
         """
-        print('Loading img:%s'%fname)
+        #print('Loading img:%s'%fname)
         try:
             img = Image.open(fname)
         except IOError as e:
@@ -224,9 +224,10 @@ class CityDataSet():
                 [H, W, 2] for graddir GT if self._mode is 'train_dir'
                 None for graddir GT if self._mode is 'train_sem'
         """
-        print('Loading sem_gt:%s'%sem_fname)
+        #print('Loading sem_gt:%s'%sem_fname)
         if (dir_fname is not None) and (self._mode == 'train_dir'):
-            print('Loading dir_gt:%s'%dir_fname)
+            #print('Loading dir_gt:%s'%dir_fname)
+            pass
         if self._mode == "train_sem" or self._mode == "train_dir":
             try:
                 img = Image.open(sem_fname)

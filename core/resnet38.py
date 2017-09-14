@@ -132,13 +132,13 @@ class ResNet38:
 
         # The graddir unique part: conv1 + conv2 + 3*conv3(kernel: [1x1])
         # Gating operation, need semantic GT
-        gated_feat = self._gate(sem_gt, model['B7'])
+        model['gated_feat'] = self._gate(sem_gt, model['B7'])
 
         with tf.variable_scope("graddir"):
             # The normal feature layers
             shape_dict['grad_convs1'] = [[3,3,4096,512],[3,3,512,512]]
             with tf.variable_scope('convs'):
-                model['grad_convs1'] = nn.grad_convs(gated_feat, feed_dict,
+                model['grad_convs1'] = nn.grad_convs(model['gated_feat'], feed_dict,
                                                    shape_dict['grad_convs1'], var_dict)
             # The norm layers to normalize the output to have same magnitude as grad GT
             shape_dict['grad_convs2'] = [[1,1,512,256],[1,1,256,256],[1,1,256,2]]
@@ -234,28 +234,33 @@ class ResNet38:
         sem_gt = tf.squeeze(sem_gt, axis=3) #NOTE sem_gt [1,64,128]
 
         model = self._build_model(image, sem_gt, is_train=True)
-        pred = model['grad_norm'] #NOTE pred  [1, 64,128,2]
+        pred0 = model['grad_norm'] #NOTE pred  [1, 64,128,2]
 
         ## downsample graddir label by 8
         # remove the first dim
-        pred = tf.squeeze(pred) #NOTE pred [64,128,2]
+        pred = tf.squeeze(pred0) #NOTE pred [64,128,2]
         label = tf.squeeze(label) #NOTE label [512,1024,2]
         label = tf.image.resize_images(label, new_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR) #NOTE label [64,128,2]
 
         # The predicted graddir and GT are already normalized
         product = tf.reduce_sum(tf.multiply(pred,label), axis=2) #NOTE product [64,128]
+        product = tf.maximum(product, -1.0)
+        product = tf.minimum(product, 1.0)
         cos_out = tf.acos(product) #NOTE cos_out [64,128]
         sem_gt = tf.squeeze(sem_gt) #NOTE sem_gt [64,128]
+        #NOTE, to use tf.boolean_mask(), bool_mask must have static dim
+        sem_gt = tf.reshape(sem_gt, [64,128])
         bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [64,128]
         valid_cos_out = tf.boolean_mask(cos_out, bool_mask) #NOTE valid_cos_out 1-D tensor
         loss_grad = tf.reduce_mean(tf.square(valid_cos_out))
         loss_total = loss_grad + self._weight_decay(params['decay_rate'])
+        check_op = tf.add_check_numerics_ops()
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
 
-        return train_step, loss_total, product, cos_out, valid_cos_out, loss_grad
+        return train_step, loss_total, check_op
 
     def inf(self, image, sem_gt):
         ''' Input: image [1, H, W, C]
