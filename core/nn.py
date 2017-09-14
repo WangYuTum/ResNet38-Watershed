@@ -270,17 +270,14 @@ def norm(input_tensor):
     ''' Normalize the gradddir
         Input: [1, H, W, 2]'''
     shape = tf.shape(input_tensor)
-    new_shape = [shape[1], shape[2], shape[3]]
-    vec_mat = tf.reshape(input_tensor, new_shape)
+    vec_mat = tf.squeeze(input_tensor)
 
     norm_val = tf.sqrt(tf.reduce_sum(tf.multiply(vec_mat, vec_mat), axis=2))
     zero_bool = tf.equal(norm_val,0)
     one_mat = tf.cast(zero_bool, tf.float32)
     norm_val = tf.add(norm_val, one_mat)
-    new_shape = [shape[1], shape[2], 1]
-    norm_val = tf.reshape(norm_val, new_shape)
-
     normed_vec = tf.div(vec_mat, norm_val)
+
     new_shape = [shape[0], shape[1], shape[2], shape[3]]
     normed_vec = tf.reshape(normed_vec, new_shape)
 

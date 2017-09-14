@@ -146,6 +146,7 @@ class ResNet38:
                 model['grad_convs2'] = nn.grad_norm(model['grad_convs1'], feed_dict,
                                                  shape_dict['grad_convs2'], var_dict)
             # Normalize the output to have unit vectors
+            ##TODO, check
             model['grad_norm'] = nn.norm(model['grad_convs2'])
 
         return model
@@ -158,11 +159,15 @@ class ResNet38:
                    feat_input [1, H, W, 4096]
             Output: gated feature maps [1, H, W, 4096]'''
 
-        # TODO: Only gate class car, car label
-        sem_bool = tf.equal(sem_input, 13)
-        sem_bin = tf.cast(sem_bool, tf.float32)
+        # NOTE: Only gate class car, car label
+        sem_bool = tf.equal(sem_input, 13) #NOTE [1, H, W]
+        sem_bin = tf.cast(sem_bool, tf.float32) #NOTE [1, H, W], zeros/ones
+        sem_shape = tf.shape(sem_bin)
+        new_shape = [sem_shape[0], sem_shape[1], sem_shape[2], 1]
+        sem_bin = tf.reshape(sem_bin, new_shape) #NOTE, sem_bin [1, H, W, 1]
 
-        gated_feat = tf.multiply(feat_input, sem_bin)
+        ## Gate
+        gated_feat = tf.multiply(feat_input, sem_bin) #NOTE [1, H, W, 4096]
 
         return gated_feat
 
@@ -214,9 +219,11 @@ class ResNet38:
         small_size = [full_size[0]/2, full_size[1]/2]
         small_size = tf.cast(small_size, tf.int32)
         image = tf.image.resize_images(image, small_size)
-        label = tf.image.resize_images(label, small_size)
+        label = tf.image.resize_images(label, small_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         sem_gt = tf.reshape(sem_gt, [1, full_size[0], full_size[1], 1])
         sem_gt = tf.image.resize_images(sem_gt, small_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+
+        #NOTE: image [1,512,1024,3], sem_gt [1,512,1024,1], label [1,512,1024,2]
 
         ## downsample sem_gt by 8
         sem_shape = tf.shape(sem_gt)
@@ -224,29 +231,31 @@ class ResNet38:
         new_size = tf.cast(new_size, tf.int32)
         # sem_gt = tf.reshape(sem_gt, [sem_shape[0], sem_shape[1], sem_shape[2], 1])
         sem_gt = tf.image.resize_images(sem_gt, new_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        sem_gt = tf.squeeze(sem_gt, axis=0)
+        sem_gt = tf.squeeze(sem_gt, axis=3) #NOTE sem_gt [1,64,128]
 
         model = self._build_model(image, sem_gt, is_train=True)
-        pred = model['grad_norm']
+        pred = model['grad_norm'] #NOTE pred  [1, 64,128,2]
 
         ## downsample graddir label by 8
         # remove the first dim
-        pred = tf.squeeze(pred)
-        label = tf.squeeze(label)
-        label = tf.image.resize_images(label, new_size)
+        pred = tf.squeeze(pred) #NOTE pred [64,128,2]
+        label = tf.squeeze(label) #NOTE label [512,1024,2]
+        label = tf.image.resize_images(label, new_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR) #NOTE label [64,128,2]
 
         # The predicted graddir and GT are already normalized
-        # TODO: product is nan!
-        product = tf.reduce_sum(tf.multiply(pred,label), axis=2)
-        cos_out = tf.acos(product)
-        loss_grad = tf.square(tf.norm(cos_out))
+        product = tf.reduce_sum(tf.multiply(pred,label), axis=2) #NOTE product [64,128]
+        cos_out = tf.acos(product) #NOTE cos_out [64,128]
+        sem_gt = tf.squeeze(sem_gt) #NOTE sem_gt [64,128]
+        bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [64,128]
+        valid_cos_out = tf.boolean_mask(cos_out, bool_mask) #NOTE valid_cos_out 1-D tensor
+        loss_grad = tf.reduce_mean(tf.square(valid_cos_out))
         loss_total = loss_grad + self._weight_decay(params['decay_rate'])
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
 
-        return train_step, loss_total, product, loss_grad, cos_out
+        return train_step, loss_total, product, cos_out, valid_cos_out, loss_grad
 
     def inf(self, image, sem_gt):
         ''' Input: image [1, H, W, C]

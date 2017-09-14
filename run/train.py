@@ -9,7 +9,7 @@ import tensorflow as tf
 import data_utils as dt
 from core import resnet38
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 train_data_params = {'data_dir': '../data/CityDatabase',
                      'dataset': 'train_dir',
                      'batch_size': 1}
@@ -63,7 +63,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = 'watershed_preimgneta1_grad8s_ep%d.npy'%(epoch)
+                save_name = 'watershed_preimgneta1_grad8s_up_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 
