@@ -221,7 +221,8 @@ class ResNet38:
         # NOTE: don't update BN moving mean and moving var, however train BN gamma and beta
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
-            train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
+            # train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
+            train_step = tf.train.MomentumOptimizer(params['lr'],0.9).minimize(loss_total)
 
         return train_step, loss_total
 

@@ -24,7 +24,7 @@ test_data_params = {'data_dir': '../data/CityDatabase',
 dataset = dt.CityDataSet(test_data_params)
 
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/watershed_precitya1_sem8s_upsta_ep3.npy'}
+                'feed_weight': '../data/saved_weights/watershed_precitya1_sem8s_momen_up_ep5.npy'}
 num_val = 500
 num_test = 1525
 iterations = 4
