@@ -448,3 +448,11 @@ def get_bias(feed_dict, shape):
     var = tf.get_variable(name="bias", initializer=init, shape=shape)
 
     return var
+
+def _add_histogram_kernels(scope):
+    ''' Given scope, add kernel to histogram under the scope '''
+
+    with tf.variable_scope(scope, reuse=True):
+        tf.summary.histogram(scope.name+'/kernel',tf.get_variable('kernel'))
+
+

@@ -149,7 +149,20 @@ class ResNet38:
             ##TODO, check
             model['grad_norm'] = nn.norm(model['grad_convs2'])
 
+        self._add_histogram_kernels()
+
         return model
+
+    def _add_histogram_kernels(self):
+
+        scope_list = ["shared/B0", "shared/B2_1/conv1", "shared/B2_1/conv2",
+                      "shared/B2_2/conv1", "shared/B2_2/conv2", "shared/B2_3/conv1",
+                      "shared/B2_3/conv2", "shared/B3_1/conv1", "shared/B3_1/conv2",
+                      "shared/B3_2/conv1", "shared/B3_2/conv2", "shared/B3_3/conv1",
+                      "shared/B3_3/conv2"]
+        for scope in scope_list:
+            with tf.variable_scope(scope, reuse=True):
+                tf.summary.histogram(scope+'/kernel',tf.get_variable('kernel'))
 
     def _gate(self, sem_input, feat_input):
         ''' This function takes inputs as semantic result and feature maps,
@@ -251,16 +264,19 @@ class ResNet38:
         #NOTE, to use tf.boolean_mask(), bool_mask must have static dim
         sem_gt = tf.reshape(sem_gt, [64,128])
         bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [64,128]
-        valid_cos_out = tf.boolean_mask(cos_out, bool_mask) #NOTE valid_cos_out 1-D tensor
-        loss_grad = tf.reduce_mean(tf.square(valid_cos_out))
-        loss_total = loss_grad + self._weight_decay(params['decay_rate'])
-        check_op = tf.add_check_numerics_ops()
+        # if no label is 13, set loss to 0.0
+        valid_cos_out0 = tf.cond(tf.equal(tf.reduce_sum(tf.cast(bool_mask, tf.int32)), 0), lambda: 0.0, lambda: tf.boolean_mask(cos_out, bool_mask))
+        #valid_cos_out = tf.boolean_mask(cos_out, bool_mask) #NOTE valid_cos_out 1-D tensor
+        loss_grad = tf.reduce_mean(tf.square(valid_cos_out0))
+        loss_grad_valid = tf.cond(tf.is_nan(loss_grad), lambda: 0.0, lambda: loss_grad)
+        loss_total = loss_grad_valid + self._weight_decay(params['decay_rate'])
+        #check_op = tf.add_check_numerics_ops()
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
 
-        return train_step, loss_total, check_op
+        return train_step, loss_total
 
     def inf(self, image, sem_gt):
         ''' Input: image [1, H, W, C]
