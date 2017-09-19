@@ -164,6 +164,14 @@ class ResNet38:
             with tf.variable_scope(scope, reuse=True):
                 tf.summary.histogram(scope+'/kernel',tf.get_variable('kernel'))
 
+    def _add_gradients_histogram(self, grad_var_list):
+
+        #var0_name = "shared/B0/kernel"
+        for var_i in grad_var_list:
+            #if var_i[1].name.find(var0_name) != -1:
+            tf.summary.histogram(var_i[1].name+"/gradients", var_i[0])
+
+
     def _gate(self, sem_input, feat_input):
         ''' This function takes inputs as semantic result and feature maps,
             returns gated feature maps, where non-relevant classes on the
@@ -270,13 +278,19 @@ class ResNet38:
         loss_grad = tf.reduce_mean(tf.square(valid_cos_out0))
         loss_grad_valid = tf.cond(tf.is_nan(loss_grad), lambda: 0.0, lambda: loss_grad)
         loss_total = loss_grad_valid + self._weight_decay(params['decay_rate'])
-        #check_op = tf.add_check_numerics_ops()
+        check_op = tf.add_check_numerics_ops()
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
-            train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
+            #train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
+            var_list = tf.trainable_variables()
+            #optimizer = tf.train.MomentumOptimizer(params['lr'],0.9)
+            optimizer = tf.train.AdamOptimizer(params['lr'])
+            grad_var = optimizer.compute_gradients(loss_total) #list of (grad, var)
+            self._add_gradients_histogram(grad_var)
+            train_step = optimizer.apply_gradients(grad_var)
 
-        return train_step, loss_total
+        return train_step, loss_total, check_op
 
     def inf(self, image, sem_gt):
         ''' Input: image [1, H, W, C]

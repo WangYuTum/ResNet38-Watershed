@@ -253,16 +253,18 @@ def grad_norm(input_tensor, feed_dict, shape, var_dict=None):
         is_train = False
 
     # The only relu layer
-    RELU_out = ReLu_layer(input_tensor)
+    RELU_out1 = ReLu_layer(input_tensor)
     # The first conv layer
     with tf.variable_scope('conv1'):
-        CONV_out1 = conv_layer(RELU_out, feed_dict, 1, 'SAME', shape[0], var_dict)
+        CONV_out1 = conv_layer(RELU_out1, feed_dict, 1, 'SAME', shape[0], var_dict)
+    RELU_out2 = ReLu_layer(CONV_out1)
     # The second conv layer
     with tf.variable_scope('conv2'):
-        CONV_out2 = conv_layer(CONV_out1, feed_dict, 1, 'SAME', shape[1], var_dict)
+        CONV_out2 = conv_layer(RELU_out2, feed_dict, 1, 'SAME', shape[1], var_dict)
+    RELU_out3 = ReLu_layer(CONV_out2)
     # The third conv layer
     with tf.variable_scope('conv3'):
-        CONV_out3 = conv_layer(CONV_out2, feed_dict, 1, 'SAME', shape[2], var_dict)
+        CONV_out3 = conv_layer(RELU_out3, feed_dict, 1, 'SAME', shape[2], var_dict)
 
     return CONV_out3
 
@@ -272,15 +274,20 @@ def norm(input_tensor):
     shape = tf.shape(input_tensor)
     vec_mat = tf.squeeze(input_tensor)
 
-    norm_val = tf.sqrt(tf.reduce_sum(tf.multiply(vec_mat, vec_mat), axis=2))
-    zero_bool = tf.equal(norm_val,0)
-    one_mat = tf.cast(zero_bool, tf.float32)
-    norm_val = tf.add(norm_val, one_mat)
-    norm_val = tf.reshape(norm_val, [shape[1], shape[2], 1])
-    normed_vec = tf.div(vec_mat, norm_val)
+    ## use tensorflow implementation
+    normed_vec = tf.nn.l2_normalize(vec_mat, dim=2)
+    normed_vec = tf.reshape(normed_vec, shape)
 
-    new_shape = [shape[0], shape[1], shape[2], shape[3]]
-    normed_vec = tf.reshape(normed_vec, new_shape)
+    ## use own impl
+    # norm_val = tf.sqrt(tf.reduce_sum(tf.multiply(vec_mat, vec_mat), axis=2))
+    # zero_bool = tf.equal(norm_val,0)
+    # one_mat = tf.cast(zero_bool, tf.float32)
+    # norm_val = tf.add(norm_val, one_mat)
+    # norm_val = tf.reshape(norm_val, [shape[1], shape[2], 1])
+    # normed_vec = tf.div(vec_mat, norm_val)
+
+    # new_shape = [shape[0], shape[1], shape[2], shape[3]]
+    # normed_vec = tf.reshape(normed_vec, new_shape)
 
     return normed_vec
 
