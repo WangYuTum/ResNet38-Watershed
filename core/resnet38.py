@@ -296,11 +296,17 @@ class ResNet38:
         ''' Input: image [1, H, W, C]
                    sem_gt [1, H, W]
             Output: upsampled graddir result [1, 1024, 2048, 2]'''
+        # downsample sem_gt by 8
+        sem_gt = tf.reshape(sem_gt, [1, 1024, 2048,1])
+        small_size = [128, 256]
+        sem_gt = tf.image.resize_images(sem_gt, small_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        sem_gt = tf.reshape(sem_gt, [1, 128, 256])
 
         model = self._build_model(image, sem_gt, is_train=False)
         pred = model['grad_norm']
-        pred = tf.squeeze(pred) #rm first dim
-        pred = self._upsample(pred, [1024,2048])
+
+        pred = self._upsample(pred, [1024,2048]) # [1, 1024, 2048, 2]
+        pred = tf.squeeze(pred) # rm 1st dim
 
         return pred
 
