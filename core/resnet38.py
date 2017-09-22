@@ -149,7 +149,7 @@ class ResNet38:
             ##TODO, check
             model['grad_norm'] = nn.norm(model['grad_convs2'])
 
-        self._add_histogram_kernels()
+        #self._add_histogram_kernels()
 
         return model
 
@@ -265,8 +265,8 @@ class ResNet38:
 
         # The predicted graddir and GT are already normalized
         product = tf.reduce_sum(tf.multiply(pred,label), axis=2) #NOTE product [64,128]
-        product = tf.maximum(product, -1.0)
-        product = tf.minimum(product, 1.0)
+        product = tf.maximum(product, -0.99)
+        product = tf.minimum(product, 0.99)
         cos_out = tf.acos(product) #NOTE cos_out [64,128]
         sem_gt = tf.squeeze(sem_gt) #NOTE sem_gt [64,128]
         #NOTE, to use tf.boolean_mask(), bool_mask must have static dim
@@ -278,19 +278,19 @@ class ResNet38:
         loss_grad = tf.reduce_mean(tf.square(valid_cos_out0))
         loss_grad_valid = tf.cond(tf.is_nan(loss_grad), lambda: 0.0, lambda: loss_grad)
         loss_total = loss_grad_valid + self._weight_decay(params['decay_rate'])
-        check_op = tf.add_check_numerics_ops()
+        # check_op = tf.add_check_numerics_ops()
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             #train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
             var_list = tf.trainable_variables()
-            #optimizer = tf.train.MomentumOptimizer(params['lr'],0.9)
-            optimizer = tf.train.AdamOptimizer(params['lr'])
+            optimizer = tf.train.MomentumOptimizer(params['lr'],0.9)
+            #optimizer = tf.train.AdamOptimizer(params['lr'])
             grad_var = optimizer.compute_gradients(loss_total) #list of (grad, var)
-            self._add_gradients_histogram(grad_var)
+            #self._add_gradients_histogram(grad_var)
             train_step = optimizer.apply_gradients(grad_var)
 
-        return train_step, loss_total, check_op
+        return train_step, loss_total
 
     def inf(self, image, sem_gt):
         ''' Input: image [1, H, W, C]
