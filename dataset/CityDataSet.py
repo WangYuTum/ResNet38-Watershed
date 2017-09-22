@@ -240,7 +240,7 @@ class CityDataSet():
         if (dir_fname is not None) and (self._mode == 'train_dir'):
             #print('Loading dir_gt:%s'%dir_fname)
             pass
-        if self._mode == "train_sem" or self._mode == "train_dir":
+        if self._mode == "train_sem" or self._mode == "train_dir" or self._mode == "val":
             try:
                 img = Image.open(sem_fname)
             except IOError as e:
@@ -248,7 +248,7 @@ class CityDataSet():
                 sem_label = None
                 return sem_label
             sem_label = np.array(img, dtype=np.uint8)
-            if (dir_fname is not None) and (self._mode == "train_sem"):
+            if (dir_fname is not None) and (self._mode == "train_sem" or self._mode == "val"):
                 sys.exit('Error: train mode is train_sem, while dir_fname is not None!')
         if self._mode == "train_dir":
             if dir_fname is None:
