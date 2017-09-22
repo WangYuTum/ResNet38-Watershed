@@ -194,7 +194,7 @@ class ResNet38:
 
     def _upsample(self, input_tensor, new_size):
         ''' Upsampling using Bilinear interpolation
-            Input: A tensor [batch_size, H, W, C]
+            Input: A tensor [batch_size, H, W, C] or [H,W,C]
                    new_size: python/numpy array [new_H, new_W]
             Return: upsampled tensor
         '''
@@ -299,6 +299,7 @@ class ResNet38:
 
         model = self._build_model(image, sem_gt, is_train=False)
         pred = model['grad_norm']
+        pred = tf.squeeze(pred) #rm first dim
         pred = self._upsample(pred, [1024,2048])
 
         return pred

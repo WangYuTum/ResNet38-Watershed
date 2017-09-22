@@ -5,29 +5,23 @@ from __future__ import print_function
 import os,sys
 sys.path.append("..")
 import numpy as np
+from scipy.misc import imsave
 import tensorflow as tf
 import data_utils as dt
 from core import resnet38
-from eval import evalPixelSemantic
 
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
-config_gpu = tf.ConfigProto()
-config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.9
-
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 test_data_params = {'data_dir': '../data/CityDatabase',
                      'dataset': 'val',
-                     'batch_size': 1,
-                     'pred_save_path': '../data/pred_trainIDs',
-                     'colored_save_path': '../data/pred_colored',
-                     'labelIDs_save_path': '../data/pred_labelIDs'}
+                     'batch_size': 1}
 
 dataset = dt.CityDataSet(test_data_params)
 
 model_params = {'num_classes': 19,
-                'feed_path': 'data/trained_weights/pretrained_ResNet38a1_city.npy'}
+                'feed_weight': '../data/saved_weights/watershed_preimgneta1_grad8s_up_ep3.npy'}
 num_val = 500
 num_test = 1525
-iterations = num_val
+iterations = 4
 
 # with tf.Session() as sess:
 with tf.Session(config=config_gpu) as sess:
@@ -38,8 +32,7 @@ with tf.Session(config=config_gpu) as sess:
     # Get inference result
     predict = res38.inf(img)
 
-    print('Finished building inference network ResNet38-8s')
-    accuracy = 0.0
+    print('Finished building inference network ResNet38-8s-grad')
     init = tf.global_variables_initializer()
     sess.run(init)
 
@@ -53,13 +46,6 @@ with tf.Session(config=config_gpu) as sess:
         feed_dict_ = {img: next_pair_image}
 
         pred_out = sess.run(predict, feed_dict=feed_dict_)
-        dataset.save_trainID_img(pred_out)
-
-    print("Inference done! Start transforming to colored ...")
-    dataset.pred_to_color()
-    print("Start transforming to labelIDs ...")
-    dataset.pred_to_labelID()
-    print("Start evaluating accuracy ...")
-    accuracy = evalPixelSemantic.run_eval(test_data_params['labelIDs_save_path'])
-    print("Final score {}".format(accuracy))
-
+        pred_img = = np.concatenate((pred_out, np.zeros((1024,2048,2),dtype=np.float32)), axis=-1)
+        print("Save pred to {0}".format("pred_grad"+str(i)+".png"))
+        imsave("pred_grad%d.png"%i,pred_img[:,:,0:3])
