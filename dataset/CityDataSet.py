@@ -27,7 +27,11 @@ Label_City = namedtuple( 'Label' , ['name', 'labelId', 'trainId', 'color',] )
 
 class CityDataSet():
     def __init__(self, params):
-        '''mode: 'train_sem', 'train_dir', 'val', 'test' '''
+        '''mode: 'train_sem', 'train_dir', 'val', 'test'
+           train_sem: load training images/sem_gt,
+           train_dir: load training images/sem_gt/dir_gt
+           val: load validation images/sem_gt
+           test: load test images'''
         self._mode = params.get('dataset','train_sem')
         self._dir = params.get('data_dir','../data/CityDatabase')
         self._batch_size = params.get('batch_size', 1)
@@ -73,6 +77,7 @@ class CityDataSet():
         print('Load %s dataset'%self._mode)
         files_img = []
         files_lbl = []
+        files_dir = []
 
         # Load train/val/test RGB images
         mode = 'train'
@@ -87,10 +92,14 @@ class CityDataSet():
         files_img.sort()
 
         # Load GT semantic mask
-        if self._mode == 'train_sem' or self._mode == 'train_dir':
+        if self._mode == 'train_sem' or self._mode == 'train_dir' or self._mode == "val":
+            if self._mode.find('train') != -1:
+                local_mode = 'train'
+            else:
+                local_mode = self._mode
             search_sem = os.path.join(self._dir,
                                       'gtFine',
-                                      'train',
+                                      local_mode,
                                       '*','*_gtFine_labelTrainIds.png')
             files_sem = glob.glob(search_sem)
             files_sem.sort()
@@ -107,7 +116,7 @@ class CityDataSet():
         self._num_batches = int(self._num_images / self._batch_size)
 
         print('Loaded images: {0}, Mode: {1}, semantic_GT: {2}, graddir_GT: {3}'.format(len(files_img), self._mode, len(files_sem), len(files_dir)))
-        if self._mode == 'train_sem' or self._mode == 'train_dir':
+        if self._mode == 'train_sem' or self._mode == 'train_dir' or self._mode == 'val':
             if len(files_img) != len(files_sem):
                 sys.exit('Number of train images and semantic_GTs do not match!')
         if self._mode == 'train_dir':
@@ -160,7 +169,7 @@ class CityDataSet():
             image = self._load_image(fname)
             image = image.reshape(1, *image.shape)
             # Load GT: semantic or graddir
-            if self._mode == 'train_sem' or self._mode == 'train_dir':
+            if self._mode == 'train_sem' or self._mode == 'train_dir' or self._mode == 'val':
                 sem_fname = self._sem_indices[i]
                 if self._mode == 'train_dir':
                     dir_fname = self._dir_indices[i]
@@ -173,7 +182,7 @@ class CityDataSet():
             if i == start:
                 image_batch = image
                 # Load GT: semantic or graddir
-                if self._mode == 'train_sem' or self._mode == 'train_dir':
+                if self._mode == 'train_sem' or self._mode == 'train_dir' or self._mode == 'val':
                     sem_batch = sem_label
                     if self._mode == 'train_dir':
                         dir_batch = dir_label
@@ -182,13 +191,16 @@ class CityDataSet():
             else:
                 image_batch = np.concatenate((image_batch, image))
                 # Load semantic GT
-                if self._mode == 'train_sem' or self._mode == 'train_dir':
+                if self._mode == 'train_sem' or self._mode == 'train_dir' or self._mode == 'val':
                     sem_batch = np.concatenate((sem_batch, sem_label))
                     if self._mode == 'train_dir':
                         dir_batch = np.concatenate((dir_batch, dir_label))
         if self._mode.find("train") == -1:
-            sem_batch = None
-            dir_batch = None
+            if self._mode.find("val") == -1:
+                sem_batch = None
+                dir_batch = None
+            else:
+                dir_batch = None
 
         return image_batch, sem_batch, dir_batch
 
