@@ -17,15 +17,15 @@ dataset = dt.CityDataSet(train_data_params)
 
 ## NOTE learning rate, optimizer
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/watershed_preimgneta1_sem8s__momen_up_ep25.npy',
+                'feed_weight': '../data/saved_weights/watershed_preimgneta1_grad8s_up_ep9.npy',
                 'batch_size': 1,
                 'decay_rate': 0.0005,
-                'lr': 0.0016,
+                'lr': 1e-5,
                 'save_path': '../data/saved_weights/',
                 'tsboard_save_path': '../data/tsboard/'}
 
 train_ep = 31
-save_ep = 5
+save_ep = 3
 num_train = 2975
 
 with tf.Session() as sess:
@@ -40,7 +40,7 @@ with tf.Session() as sess:
     save_dict_op = res38._var_dict
     TrainLoss_sum = tf.summary.scalar('train_loss', loss)
     Train_summary = tf.summary.merge_all()
-    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'sem_momentum_up_imgnet', sess.graph)
+    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'grad-sem0', sess.graph)
     init = tf.global_variables_initializer()
     sess.run(init)
 
@@ -62,7 +62,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = 'watershed_preimgneta1_sem8s__momen_up_ep%d.npy'%(epoch+25)
+                save_name = 'watershed_pregrada1_sem8s_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
         # TODO: Shuffle dataset

@@ -263,8 +263,8 @@ def BN(input_tensor, feed_dict=None, bn_scope=None,is_train=False, shape=None,
 
     bn_training = True
     bn_trainable = True
-    # if is not training, freeze all params
-    if is_train is False:
+    # if is not training or during alternate training, freeze all params
+    if is_train is False or scope_name.find('shared') != -1:
         bn_training = False
         bn_trainable = False
     else:
@@ -321,7 +321,12 @@ def get_conv_kernel(feed_dict, shape):
         shape = init_val.shape
         print('Load kernel with shape %s'%str(shape))
         init = tf.constant_initializer(value=init_val)
-    var = tf.get_variable(name='kernel', initializer=init, shape=shape)
+
+    # during alternate training sem
+    if scope_name.find('shared') != -1:
+        var = tf.get_variable(name='kernel', initializer=init, shape=shape, trainable=False)
+    else:
+        var = tf.get_variable(name='kernel', initializer=init, shape=shape, trainable=True)
 
     return var
 
