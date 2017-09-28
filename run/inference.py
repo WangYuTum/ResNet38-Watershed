@@ -10,15 +10,15 @@ import tensorflow as tf
 import data_utils as dt
 from core import resnet38
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 test_data_params = {'data_dir': '../data/CityDatabase',
-                     'dataset': 'train_dir',
+                     'dataset': 'val',
                      'batch_size': 1}
 
 dataset = dt.CityDataSet(test_data_params)
 
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/watershed_preimgneta1_grad8s_up_ep3.npy'}
+                'feed_weight': '../data/saved_weights/watershed_preimgneta1_grad8s2_up_ep9.npy'}
 num_val = 500
 num_test = 1525
 iterations = 4

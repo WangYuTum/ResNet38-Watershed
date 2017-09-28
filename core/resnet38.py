@@ -132,11 +132,11 @@ class ResNet38:
 
         # The graddir unique part: conv1 + conv2 + 3*conv3(kernel: [1x1])
         # Gating operation, need semantic GT
-        model['gated_feat'] = self._gate(sem_gt, model['B7'])
+        model['gated_feat'] = self._gate(sem_gt, model['B6'])
 
         with tf.variable_scope("graddir"):
             # The normal feature layers
-            shape_dict['grad_convs1'] = [[3,3,4096,512],[3,3,512,512]]
+            shape_dict['grad_convs1'] = [[3,3,2048,512],[3,3,512,512]]
             with tf.variable_scope('convs'):
                 model['grad_convs1'] = nn.grad_convs(model['gated_feat'], feed_dict,
                                                    shape_dict['grad_convs1'], var_dict)
@@ -284,8 +284,8 @@ class ResNet38:
         with tf.control_dependencies(update_ops):
             #train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
             var_list = tf.trainable_variables()
-            optimizer = tf.train.MomentumOptimizer(params['lr'],0.9)
-            #optimizer = tf.train.AdamOptimizer(params['lr'])
+            #optimizer = tf.train.MomentumOptimizer(params['lr'],0.9)
+            optimizer = tf.train.AdamOptimizer(params['lr'])
             grad_var = optimizer.compute_gradients(loss_total) #list of (grad, var)
             #self._add_gradients_histogram(grad_var)
             train_step = optimizer.apply_gradients(grad_var)
