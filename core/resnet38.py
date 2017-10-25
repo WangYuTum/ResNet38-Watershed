@@ -133,13 +133,52 @@ class ResNet38:
                                                                  dropout=dropout,
                                                                  var_dict=var_dict)
 
-        # The semantic unique part: conv1(+bias1) + conv2(+bias2). Output feature stride=8
-        with tf.variable_scope('semantic'):
-            shape_dict['semantic'] = [[3,3,4096,512],[3,3,512,self._num_classes]]
-            model['semantic'] = nn.ResUnit_tail(self._data_format, model['B7'], feed_dict,
-                                            shape_dict['semantic'], var_dict)
+        ## The semantic unique part: conv1(+bias1) + conv2(+bias2). Output feature stride=8
+        ## with tf.variable_scope('semantic'):
+        ##    shape_dict['semantic'] = [[3,3,4096,512],[3,3,512,self._num_classes]]
+        ##    model['semantic'] = nn.ResUnit_tail(self._data_format, model['B7'], feed_dict,
+        ##                                    shape_dict['semantic'], var_dict)
+
+        # The graddir unique part: conv1 + conv2 + 3*conv3(kernel: [1x1])
+        # Gating operation, need semantic GT while training and inference
+        model['gated_feat'] = self._gate(sem_gt, model['B7'])
+
+        with tf.variable_scope("graddir"):
+            # Further feature extractors
+            shape_dict['grad_convs1'] = [[3,3,4096,512],[3,3,512,512]]
+            with tf.variable_scope('convs1'):
+                model['grad_convs1'] = nn.grad_convs(self._data_format, model['gated_feat'], feed_dict,
+                                                     shape_dict['grad_convs1'], var_dict)
+            # The normalize the output as the magnitued of GT
+            shape_dict['grad_convs2'] = [[1,1,512,256],[1,1,256,256],[1,1,256,2]]
+            with tf.variable_scope('convs2'):
+                model['grad_convs2'] = nn.grad_norm(self._data_format, model['grad_convs1'], feed_dict,
+                                                    shape_dict['grad_convs2'], var_dict)
+            # Normalize the output to have unit vectors
+            ##TODO, check
+            model['grad_norm'] = nn.norm(self._data_format, model['grad_convs2'])
 
         return model
+
+    def _gate(self, sem_input, feat_input):
+        ''' This function takes inputs as semantic result and feature maps,
+            returns gated feature maps, where non-relevant classes on the
+            feature maps are set to zero
+            Input: sem_input [batch_size, 1, H, W]
+                   feat_input [batch_size, 4096, H, W]
+            Output: gated feature maps [batch_size, H, W, 4096]
+            NOTE: The default data format is "NCHW", the function also works for "NHWC" without any changes in code.
+        '''
+
+        # NOTE: Only gate class car for now
+        sem_bool = tf.equal(sem_input, 13) #NOTE [batch_size, 1, H, W]
+        sem_bin = tf.cast(sem_bool, tf.float32) #NOTE [batch_size, 1, H, W], zeros/ones
+
+        ## Gate
+        gated_feat = tf.multiply(feat_input, sem_bin) #NOTE [batch_size, 4096, H, W]
+
+        return gated_feat
+
 
     def _upsample(self, input_tensor, new_size):
         ''' Upsampling using Bilinear interpolation
