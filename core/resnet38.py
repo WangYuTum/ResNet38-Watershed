@@ -22,7 +22,7 @@ class ResNet38:
 
         self._num_classes = params.get('num_classes', 19)
 
-    def _build_model(self, image, is_train=False):
+    def _build_model(self, image, sem_gt, is_train=False):
         '''If is_train, save weight to self._var_dict,
            otherwise, don't save weights
            '''
@@ -40,6 +40,7 @@ class ResNet38:
 
         if self._data_format == "NCHW":
             image = tf.transpose(image, [0, 3, 1, 2])
+            sem_gt = tf.transpose(image, [0, 3, 1, 2])
 
         shape_dict = {}
         shape_dict['B0'] = [3,3,3,64]
@@ -133,12 +134,6 @@ class ResNet38:
                                                                  dropout=dropout,
                                                                  var_dict=var_dict)
 
-        ## The semantic unique part: conv1(+bias1) + conv2(+bias2). Output feature stride=8
-        ## with tf.variable_scope('semantic'):
-        ##    shape_dict['semantic'] = [[3,3,4096,512],[3,3,512,self._num_classes]]
-        ##    model['semantic'] = nn.ResUnit_tail(self._data_format, model['B7'], feed_dict,
-        ##                                    shape_dict['semantic'], var_dict)
-
         # The graddir unique part: conv1 + conv2 + 3*conv3(kernel: [1x1])
         # Gating operation, need semantic GT while training and inference
         model['gated_feat'] = self._gate(sem_gt, model['B7'])
@@ -155,7 +150,6 @@ class ResNet38:
                 model['grad_convs2'] = nn.grad_norm(self._data_format, model['grad_convs1'], feed_dict,
                                                     shape_dict['grad_convs2'], var_dict)
             # Normalize the output to have unit vectors
-            ##TODO, check
             model['grad_norm'] = nn.norm(self._data_format, model['grad_convs2'])
 
         return model
@@ -213,55 +207,55 @@ class ResNet38:
              # default learning rate for Adam: 0.001
              # train_op = tf.train.AdamOptimizer().minimize(total_loss)
 
-    def train_sem(self, image, label, params):
-        ''' This function only trains semantic branch.
-            Input: Image [batch_size, 504, 504, 3]
-                   Label [batch_size, 504, 504, 1]
+    def train_grad(self, image, sem_gt, grad_gt, params):
+        ''' This function only trains graddir branch.
+            Input: Image [batch_size, 512, 1024, 3]
+                   sem_gt [batch_size, 64, 128, 1]
+                   grad_gt [batch_size, 64, 128, 2]
                    params: decay_rate, lr
         '''
-        # NOTE: train on downsampled results 
 
-        model = self._build_model(image, is_train=True)
-        pred = model['semantic'] #NOTE, pred is [batch_size, 19,63,63]
-
-        new_shape = [params['batch_size'], self._num_classes, 63*63]
-        pred = tf.reshape(pred, new_shape) #NOTE: [batch_size, 19, 63*63]
-
-        label = tf.image.resize_images(label, [63,63], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        model = self._build_model(image, sem_gt, is_train=True)
+        pred = model['grad_norm'] #NOTE pred  [batch_size, 2, 64,128] if "NCHW"
         if self._data_format == 'NCHW':
-            pred = tf.transpose(pred, [0, 2, 1]) #NOTE, label is [batch_size, 63*63,19]
-        label = tf.reshape(label, [params['batch_size'] ,63*63]) #NOTE, label is [batch_size, 63*63]
-        # NOTE: the void number is 19, car is 13
-        void_bool = tf.equal(label, 19)
-        valid_bool = tf.logical_not(void_bool)
-        valid_label = tf.boolean_mask(label, valid_bool)
-        valid_pred = tf.boolean_mask(pred, valid_bool)
+            pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 64, 128, 2]
 
-        loss_sem = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_label, logits=valid_pred))
-        loss_total = loss_sem + self._weight_decay(params['decay_rate'])
-        # NOTE: don't update BN moving mean and moving var of shared layers, however train BN gamma and beta.
+        # The predicted graddir and GT are already normalized
+        product = tf.reduce_sum(tf.multiply(pred,grad_gt), axis=3) #NOTE product [batch_size, 64,128]
+        product = tf.maximum(product, -0.99)
+        product = tf.minimum(product, 0.99)
+        cos_out = tf.acos(product)
+        sem_gt = tf.squeeze(sem_gt) #NOTE sem_gt [batch_size, 64,128]
+        bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [batch_size, 64,128]
+        # if no label is 13, set loss to 0.0
+        valid_cos_out = tf.cond(tf.equal(tf.reduce_sum(tf.cast(bool_mask, tf.int32)), 0), lambda: 0.0, lambda: tf.boolean_mask(cos_out, bool_mask))
+        loss_grad = tf.reduce_mean(tf.square(valid_cos_out))
+        loss_grad_valid = tf.cond(tf.is_nan(loss_grad), lambda: 0.0, lambda: loss_grad)
+        loss_total = loss_grad_valid + self._weight_decay(params['decay_rate'])
+
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
-            # train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
-            train_step = tf.train.MomentumOptimizer(params['lr'],0.9).minimize(loss_total)
+            train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
 
         return train_step, loss_total
 
-    def inf(self, image):
-        ''' Input: Image [1, H, W, C]
-            Output: upsampled pred [1, 1024, 2048, 1]
-            Note that it only produce semantic output.'''
+    def inf(self, image, sem_gt):
+        ''' Input: Image [batch_size, 1024, 2048, 3]
+                   sem_gt [batch_size, 1024, 2048, 1]
+            Output: upsampled graddir result [batch_size, 1024, 2048, 2]
+        '''
+        small_size = [128, 256]
+        sem_gt0 = tf.image.resize_images(sem_gt, small_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        model = self._build_model(image, sem_gt0, is_train=False)
 
-        model = self._build_model(image, is_train=False)
-        pred = model['semantic']
+        pred = model['grad_norm'] #NOTE, pred is [batch_size, 2, 128, 256] if "NCHW"
         if self._data_format == 'NCHW':
-            pred = tf.transpose(pred, [0,2,3,1]) #NOTE: [batch_size, H, W, 19]
-        upsampled_pred = self._upsample(pred, [1024,2048])
+            pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 128, 256, 2]
+        pred = self._upsample(pred, [1024,2048]) # [batch_size, 1024, 2048, 2]
 
-        ## Predict class label: [batch, H, W, C]
-        pred_label = tf.argmax(tf.nn.softmax(upsampled_pred), axis=3)
+        # gate
+        pred = self._gate(sem_gt, pred)
 
-        return pred_label
-
+        return pred
 
 
