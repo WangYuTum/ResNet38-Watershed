@@ -31,7 +31,7 @@ Label_City = namedtuple( 'Label' , ['name', 'labelId', 'trainId', 'color',] )
 
 class CityDataSet():
     def __init__(self, params):
-        '''mode: 'train_sem', 'val_sem','test_sem' '''
+        '''mode: 'train_sem', 'val_sem','test_sem', 'train_grad', 'val_grad' '''
 
         self._mode = params.get('mode','train_sem')
         self._batch_size = params.get('batch_size', 4)
@@ -80,6 +80,10 @@ class CityDataSet():
         # TODO
         elif self._mode == 'test_sem':
             self._TFrecord_file = '/work/wangyu/cityscape_test.tfrecord'
+        elif self._mode == 'train_grad':
+            self._TFrecord_file = '/work/wangyu/cityscape_train.tfrecord'
+        elif self._mode == 'val_grad':
+            self._TFrecord_file = '/work/wangyu/cityscape_val.tfrecord'
         else:
             sys.exit('No valid mode!')
         self._dataset = self._build_pipeline()
@@ -106,7 +110,7 @@ class CityDataSet():
         # Cast RGB pixels to tf.float32
         data_dict['img'] = tf.cast(out_data['img'], tf.float32)
         data_dict['sem_gt'] = tf.cast(out_data['sem_gt'], tf.int32)
-        # data_dict['grad_gt'] = tf.cast(out_data['grad_gt'], tf.float32)
+        data_dict['grad_gt'] = tf.cast(out_data['grad_gt'], tf.float32)
         # data_dict['wt_gt'] = tf.cast(out_data['wt_gt'], tf.int32)
 
         return data_dict
@@ -134,7 +138,7 @@ class CityDataSet():
         transformed = {}
         transformed['img'] = rgb_img
         transformed['sem_gt'] = example['sem_gt']
-        # transformed['grad_gt'] = example['grad_gt']
+        transformed['grad_gt'] = example['grad_gt']
         # transformed['wt_gt'] = example['wt_gt']
 
         return transformed
@@ -176,6 +180,40 @@ class CityDataSet():
 
         return transformed
 
+    def _grad_train_transform(self, example):
+        '''Given a standardized example: dictonary
+            Return: a dictionary, where RGB_image and sem_gt/grad_gt is transformed
+
+            Transformation:
+                * Resize image to [512, 1024] fit TitanX 12GB memory
+                * Resize sem_gt/grad_gt by 1/(2*8) for loss calculation, [64,128]
+                * Randomly flip image/sem_gt/grad_gt together
+            After this transformation:
+                * Image has shape: [512,1024,3], tf.float32
+                * sem_gt has shape: [64,128,1], tf.float32
+                * grad_gt has shape: [64,128,2], tf.float32
+        '''
+        image = tf.image.resize_images(example['img'], [512,1024], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        sem_gt = tf.image.resize_images(example['sem_gt'], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        sem_gt = tf.cast(sem_gt, tf.float32)
+        grad_gt = tf.image.resize_images(example['grad_gt'], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        stacked = tf.concat([image, sem_gt, grad_gt], axis=-1) #NOTE, shape [H, W, 6]
+
+        # Randomly flip
+        stacked = tf.image.random_flip_left_right(stacked)
+
+        # Pack the result
+        image = stacked[:,:,0:3]
+        sem_gt = tf.cast(stacked[:,:,3:4], tf.int32)
+        grad_gt = stacked[:,:,4:6]
+        transformed = {}
+        transformed['img'] = image
+        transformed['sem_gt'] = sem_gt
+        transformed['grad_gt'] = grad_gt
+        # transformed['wt_gt'] = example['wt_gt']
+
+        return transformed
+
     def _build_semtrain_pipeline(self, TFrecord_file):
         '''
             Given the .tfrecord path, build a datapipeline using member functions
@@ -209,6 +247,41 @@ class CityDataSet():
 
         return dataset
 
+    def _build_gradtrain_pipeline(self, TFrecord_file):
+
+        '''
+            Given the .tfrecord path, build a datapipeline using member functions
+            Return: A TF dataset object
+
+            NOTE: The .tfrecord file is compressed using "GZIP"
+        '''
+        dataset = tf.contrib.data.TFRecordDataset(TFrecord_file, "GZIP")
+        dataset = dataset.repeat()
+        dataset = dataset.map(self._parse_single_record, num_threads=3, output_buffer_size=9)
+        dataset = dataset.map(self._image_standardization, num_threads=3, output_buffer_size=9)
+        dataset = dataset.map(self._grad_train_transform, num_threads=3, output_buffer_size=9)
+        dataset = dataset.shuffle(buffer_size=1500)
+        dataset = dataset.batch(self._batch_size)
+
+        return dataset
+
+    def _build_gradval_pipeline(self, TFrecord_file):
+
+        '''
+            Given the .tfrecord path, build a datapipeline using member functions
+            Return: A TF dataset object
+
+            NOTE: The .tfrecord file is compressed using "GZIP"
+        '''
+
+        #NOTE: Only go through .tfrecord once and no shuffle
+        dataset = tf.contrib.data.TFRecordDataset(TFrecord_file, "GZIP")
+        dataset = dataset.map(self._parse_single_record, num_threads=3, output_buffer_size=9)
+        dataset = dataset.map(self._image_standardization, num_threads=3, output_buffer_size=9)
+        dataset = dataset.batch(self._batch_size)
+
+        return dataset
+
     def _build_pipeline(self):
 
         if self._mode == 'train_sem':
@@ -216,6 +289,10 @@ class CityDataSet():
             print('Train_sem pipeline built. Load tfrecord: {}'.format(self._TFrecord_file))
         elif self._mode == 'val_sem':
             dataset = self._build_semval_pipeline(TFrecord_file=self._TFrecord_file)
+        elif self._mode == 'train_grad':
+            dataset = self._build_gradtrain_pipeline(TFrecord_file=self._TFrecord_file)
+        elif self._mode == 'val_grad':
+            dataset = self._build_gradval_pipeline(TFrecord_file=self._TFrecord_file)
         else:
             sys.exit('Mode {} is not supported.'.format(self._mode))
 

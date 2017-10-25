@@ -219,6 +219,69 @@ def ResUnit_2convs(data_format, input_tensor, feed_dict, shape, var_dict=None):
 
     return ResUnit_out
 
+def grad_convs(data_format, input_tensor, feed_dict, shape, var_dict=None):
+        '''the conv stage for graddir branch'''
+
+    if var_dict is not None:
+        is_train = True
+    else:
+        is_train = False
+
+    # the first batch norm layer
+    BN_out1 = BN(data_format, input_tensor=input_tensor, feed_dict=feed_dict,
+                 bn_scope='bn1', is_train=is_train, shape=shape[0][2], var_dict=var_dict)
+    RELU_out1 = ReLu_layer(BN_out1)
+    # The first conv layer
+    with tf.variable_scope('conv1'):
+        CONV_out1 = conv_layer(data_format, RELU_out1, feed_dict, 1, 'SAME', shape[0], var_dict)
+    # The second batch norm layer
+    BN_out2 = BN(data_format, CONV_out1, feed_dict, 'bn2', is_train, shape[1][2], var_dict)
+    RELU_out2 = ReLu_layer(BN_out2)
+    # The second conv layer
+    with tf.variable_scope('conv2'):
+        CONV_out2 = conv_layer(data_format, RELU_out2, feed_dict, 1, 'SAME', shape[1], var_dict)
+
+    return CONV_out2
+
+def grad_norm(data_format, input_tensor, feed_dict, shape, var_dict=None):
+    '''the grad normalization stage'''
+
+    if var_dict is not None:
+        is_train = True
+    else:
+        is_train = False
+
+    # The only relu layer
+    RELU_out1 = ReLu_layer(input_tensor)
+    # The first conv layer
+    with tf.variable_scope('conv1'):
+        CONV_out1 = conv_layer(data_format, RELU_out1, feed_dict, 1, 'SAME', shape[0], var_dict)
+    RELU_out2 = ReLu_layer(CONV_out1)
+    # The second conv layer
+    with tf.variable_scope('conv2'):
+        CONV_out2 = conv_layer(data_format, RELU_out2, feed_dict, 1, 'SAME', shape[1], var_dict)
+    RELU_out3 = ReLu_layer(CONV_out2)
+    # The third conv layer
+    with tf.variable_scope('conv3'):
+        CONV_out3 = conv_layer(data_format, RELU_out3, feed_dict, 1, 'SAME', shape[2], var_dict)
+
+    return CONV_out3
+
+def norm(data_format, input_tensor):
+    ''' Normalize the gradddir
+        Input: [batch_size, H, W, 2]
+    '''
+
+    if data_format == 'NCHW':
+        norm_dim = 1
+    else:
+        norm_dim = 3
+
+    ## use tensorflow implementation
+    normed_vec = tf.nn.l2_normalize(vec_mat, dim=norm_dim)
+
+    return normed_vec
+
 def conv_dilate_layer(data_format, input_tensor, feed_dict, rate, padding='SAME',
                       shape=None, var_dict=None):
     '''dilated convolution layer using tensorflow atrous_conv2d'''
