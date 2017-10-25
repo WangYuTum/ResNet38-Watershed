@@ -40,7 +40,7 @@ class ResNet38:
 
         if self._data_format == "NCHW":
             image = tf.transpose(image, [0, 3, 1, 2])
-            sem_gt = tf.transpose(image, [0, 3, 1, 2])
+            sem_gt = tf.transpose(sem_gt, [0, 3, 1, 2])
 
         shape_dict = {}
         shape_dict['B0'] = [3,3,3,64]
@@ -225,7 +225,7 @@ class ResNet38:
         product = tf.maximum(product, -0.99)
         product = tf.minimum(product, 0.99)
         cos_out = tf.acos(product)
-        sem_gt = tf.squeeze(sem_gt) #NOTE sem_gt [batch_size, 64,128]
+        sem_gt = tf.reshape(sem_gt, [params['batch_size'],64,128]) #NOTE sem_gt [batch_size, 64,128]
         bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [batch_size, 64,128]
         # if no label is 13, set loss to 0.0
         valid_cos_out = tf.cond(tf.equal(tf.reduce_sum(tf.cast(bool_mask, tf.int32)), 0), lambda: 0.0, lambda: tf.boolean_mask(cos_out, bool_mask))

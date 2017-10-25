@@ -10,9 +10,9 @@ import data_utils as dt
 from core import resnet38
 
 # Prepare dataset
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 train_data_params = {'mode': 'train_grad',
-                     'batch_size': 3}
+                     'batch_size': 1}
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
     CityData = dt.CityDataSet(train_data_params)
@@ -21,7 +21,7 @@ with tf.device('/cpu:0'):
 # Hparameter
 model_params = {'num_classes': 19,
                 'feed_weight': '../data/trained_weights/pretrained_ResNet38a1_imgnet.npy',
-                'batch_size': 3,
+                'batch_size': 1,
                 'decay_rate': 0.0005,
                 'lr': 0.0008,
                 'data_format': "NCHW", # optimal for cudnn

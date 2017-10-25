@@ -220,7 +220,7 @@ def ResUnit_2convs(data_format, input_tensor, feed_dict, shape, var_dict=None):
     return ResUnit_out
 
 def grad_convs(data_format, input_tensor, feed_dict, shape, var_dict=None):
-        '''the conv stage for graddir branch'''
+    '''the conv stage for graddir branch'''
 
     if var_dict is not None:
         is_train = True
@@ -278,9 +278,9 @@ def norm(data_format, input_tensor):
         norm_dim = 3
 
     ## use tensorflow implementation
-    normed_vec = tf.nn.l2_normalize(vec_mat, dim=norm_dim)
+    normed_tensor = tf.nn.l2_normalize(input_tensor, dim=norm_dim)
 
-    return normed_vec
+    return normed_tensor
 
 def conv_dilate_layer(data_format, input_tensor, feed_dict, rate, padding='SAME',
                       shape=None, var_dict=None):
