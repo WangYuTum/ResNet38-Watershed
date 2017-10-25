@@ -13,50 +13,43 @@ from eval import evalPixelSemantic
 os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 config_gpu = tf.ConfigProto()
 config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.9
+test_data_params = {'mode': 'val_sem',
+                     'batch_size': 2}
 
-test_data_params = {'data_dir': '../data/CityDatabase',
-                     'dataset': 'val',
-                     'batch_size': 1,
-                     'pred_save_path': '../data/pred_trainIDs',
-                     'colored_save_path': '../data/pred_colored',
-                     'labelIDs_save_path': '../data/pred_labelIDs'}
+# The data pipeline should be on CPU
+with tf.device('/cpu:0'):
+    CityData = dt.CityDataSet(test_data_params)
+    next_batch = CityData.next_batch()
 
-dataset = dt.CityDataSet(test_data_params)
-
+# Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/watershed_precitya1_sem8s_momen_up_ep5.npy'}
+                'feed_weight': '../data/saved_weights/sem2_momen_batch4/watershed_preimgneta1_8s_ep30.npy',
+                'batch_size': 2,
+                'data_format': "NCHW", # optimal for cudnn
+                }
+
 num_val = 500
 num_test = 1525
-iterations = 4
+iterations = 2
 
-with tf.Session() as sess:
-#with tf.Session(config=config_gpu) as sess:
-    res38 = resnet38.ResNet38(model_params)
+res38 = resnet38.ResNet38(model_params)
+predict = res38.inf(image=next_batch['img'])
+init = tf.global_variables_initializer()
 
-    # Feed test/val image, batch=1
-    img = tf.placeholder(tf.float32, shape=[1, 1024, 2048, 3])
-    # Get inference result
-    predict = res38.inf(img)
+# with tf.Session() as sess:
+with tf.Session(config=config_gpu) as sess:
 
-    print('Finished building inference network ResNet38-8s')
-    accuracy = 0.0
-    init = tf.global_variables_initializer()
     sess.run(init)
+    print('Finished building inference network ResNet38-8s')
 
     print('Start inference...')
     for i in range(iterations):
         print('iter {0}:'.format(i))
-        next_pair = dataset.next_batch()
-        next_pair_image = next_pair[0]
-
-        print("shape of img: {0}".format(np.shape(next_pair_image)))
-        feed_dict_ = {img: next_pair_image}
-
-        pred_out = sess.run(predict, feed_dict=feed_dict_)
-        dataset.save_trainID_img(pred_out)
+        pred_out = sess.run(predict) #NOTE: [batch_size, 1024, 2048]
+        CityData.save_trainID_img(pred_out)
 
     print("Inference done! Start transforming to colored ...")
-    dataset.pred_to_color()
+    CityData.pred_to_color()
     # print("Start transforming to labelIDs ...")
     # dataset.pred_to_labelID()
     # print("Start evaluating accuracy ...")

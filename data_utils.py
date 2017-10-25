@@ -5,7 +5,7 @@ from __future__ import print_function
 import os
 import sys
 import numpy as np
-from dataset.CityDataSet import CityDataSet
+from dataset.cityscape_pipeline import CityDataSet
 
 
 def load_weight(path):

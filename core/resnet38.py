@@ -16,6 +16,7 @@ class ResNet38:
 
         ## use pre-trained A1 model on Cityscapes unless specified
         weight_path = params.get('feed_weight', '../data/trained_weights/pretrained_ResNet38a1_city.npy')
+        self._data_format = params.get('data_format', "NCHW")
         self._weight_dict = dt.load_weight(weight_path)
         self._var_dict = {}
 
@@ -37,6 +38,9 @@ class ResNet38:
         else:
             dropout = False
 
+        if self._data_format == "NCHW":
+            image = tf.transpose(image, [0, 3, 1, 2])
+
         shape_dict = {}
         shape_dict['B0'] = [3,3,3,64]
 
@@ -44,7 +48,7 @@ class ResNet38:
         with tf.variable_scope('shared'):
             # B0: [H,W,3] -> [H,W,64]
             with tf.variable_scope('B0'):
-                model['B0'] = nn.conv_layer(image, feed_dict, 1, 'SAME',
+                model['B0'] = nn.conv_layer(self._data_format, image, feed_dict, 1, 'SAME',
                                             shape_dict['B0'], var_dict)
 
             # B2_1: [H,W,64] -> [H/2, W/2, 128]
@@ -52,14 +56,14 @@ class ResNet38:
             shape_dict['B2']['side'] = [1,1,64,128]
             shape_dict['B2']['convs'] = [[3,3,64,128],[3,3,128,128]]
             with tf.variable_scope('B2_1'):
-                model['B2_1'] = nn.ResUnit_downsample_2convs(model['B0'],
+                model['B2_1'] = nn.ResUnit_downsample_2convs(self._data_format, model['B0'],
                                                              feed_dict,
                                                              shape_dict['B2'],
                                                              var_dict=var_dict)
             # B2_2, B2_3: [H/2, W/2, 128]
             for i in range(2):
                 with tf.variable_scope('B2_'+str(i+2)):
-                    model['B2_'+str(i+2)] = nn.ResUnit_2convs(model['B2_'+str(i+1)], feed_dict,
+                    model['B2_'+str(i+2)] = nn.ResUnit_2convs(self._data_format, model['B2_'+str(i+1)], feed_dict,
                                                               shape_dict['B2']['convs'][1],
                                                               var_dict=var_dict)
 
@@ -68,14 +72,14 @@ class ResNet38:
             shape_dict['B3']['side'] = [1,1,128,256]
             shape_dict['B3']['convs'] = [[3,3,128,256],[3,3,256,256]]
             with tf.variable_scope('B3_1'):
-                model['B3_1'] = nn.ResUnit_downsample_2convs(model['B2_3'],
+                model['B3_1'] = nn.ResUnit_downsample_2convs(self._data_format, model['B2_3'],
                                                              feed_dict,
                                                              shape_dict['B3'],
                                                              var_dict=var_dict)
             # B3_2, B3_3: [H/4, W/4, 256]
             for i in range(2):
                 with tf.variable_scope('B3_'+str(i+2)):
-                    model['B3_'+str(i+2)] = nn.ResUnit_2convs(model['B3_'+str(i+1)], feed_dict,
+                    model['B3_'+str(i+2)] = nn.ResUnit_2convs(self._data_format, model['B3_'+str(i+1)], feed_dict,
                                                               shape_dict['B3']['convs'][1],
                                                               var_dict=var_dict)
             # B4_1: [H/4, W/4, 256] -> [H/8, W/8, 512]
@@ -83,14 +87,14 @@ class ResNet38:
             shape_dict['B4']['side'] = [1,1,256,512]
             shape_dict['B4']['convs'] = [[3,3,256,512],[3,3,512,512]]
             with tf.variable_scope('B4_1'):
-                model['B4_1'] = nn.ResUnit_downsample_2convs(model['B3_3'],
+                model['B4_1'] = nn.ResUnit_downsample_2convs(self._data_format, model['B3_3'],
                                                                  feed_dict,
                                                                  shape_dict['B4'],
                                                                  var_dict=var_dict)
             # B4_2 ~ B4_6: [H/8, W/8, 512]
             for i in range(5):
                 with tf.variable_scope('B4_'+str(i+2)):
-                    model['B4_'+str(i+2)] = nn.ResUnit_2convs(model['B4_'+str(i+1)],
+                    model['B4_'+str(i+2)] = nn.ResUnit_2convs(self._data_format, model['B4_'+str(i+1)],
                                                                    feed_dict,
                                                                    shape_dict['B4']['convs'][1],
                                                                    var_dict=var_dict)
@@ -99,7 +103,7 @@ class ResNet38:
             shape_dict['B5_1']['side'] = [1,1,512,1024]
             shape_dict['B5_1']['convs'] = [[3,3,512,512],[3,3,512,1024]]
             with tf.variable_scope('B5_1'):
-                model['B5_1'] = nn.ResUnit_hybrid_dilate_2conv(model['B4_6'],
+                model['B5_1'] = nn.ResUnit_hybrid_dilate_2conv(self._data_format, model['B4_6'],
                                                                    feed_dict,
                                                                    shape_dict['B5_1'],
                                                                    var_dict=var_dict)
@@ -108,14 +112,14 @@ class ResNet38:
             shape_dict['B5_2_3'] = [[3,3,1024,512],[3,3,512,1024]]
             for i in range(2):
                 with tf.variable_scope('B5_'+str(i+2)):
-                    model['B5_'+str(i+2)] = nn.ResUnit_full_dilate_2convs(model['B5_'+str(i+1)],
+                    model['B5_'+str(i+2)] = nn.ResUnit_full_dilate_2convs(self._data_format, model['B5_'+str(i+1)],
                                                       feed_dict, shape_dict['B5_2_3'],
                                                       var_dict=var_dict)
 
             # B6: [H/8, W/8, 1024] -> [H/8, W/8, 2048]
             shape_dict['B6'] = [[1,1,1024,512],[3,3,512,1024],[1,1,1024,2048]]
             with tf.variable_scope('B6'):
-                model['B6'] = nn.ResUnit_hybrid_dilate_3conv(model['B5_3'],
+                model['B6'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B5_3'],
                                                                  feed_dict,
                                                                  shape_dict['B6'],
                                                                  dropout=dropout,
@@ -123,7 +127,7 @@ class ResNet38:
             # B7: [H/8, W/8, 2048] -> [H/8, W/8, 4096]
             shape_dict['B7'] = [[1,1,2048,1024],[3,3,1024,2048],[1,1,2048,4096]]
             with tf.variable_scope('B7'):
-                model['B7'] = nn.ResUnit_hybrid_dilate_3conv(model['B6'],
+                model['B7'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B6'],
                                                                  feed_dict,
                                                                  shape_dict['B7'],
                                                                  dropout=dropout,
@@ -132,7 +136,7 @@ class ResNet38:
         # The semantic unique part: conv1(+bias1) + conv2(+bias2). Output feature stride=8
         with tf.variable_scope('semantic'):
             shape_dict['semantic'] = [[3,3,4096,512],[3,3,512,self._num_classes]]
-            model['semantic'] = nn.ResUnit_tail(model['B7'], feed_dict,
+            model['semantic'] = nn.ResUnit_tail(self._data_format, model['B7'], feed_dict,
                                             shape_dict['semantic'], var_dict)
 
         return model
@@ -172,44 +176,22 @@ class ResNet38:
 
     def train_sem(self, image, label, params):
         ''' This function only trains semantic branch.
-            Input: Image [1, H, W, 3]
-                   Label [1, H, W, 3] only the first channel matters
+            Input: Image [batch_size, 504, 504, 3]
+                   Label [batch_size, 504, 504, 1]
                    params: decay_rate, lr
         '''
         # NOTE: train on downsampled results 
 
-        ## Randomly resize the image/label in range [0.7, 1.3], then randomly crop [504,504]
-        input_shape = tf.shape(label)
-        # randomly resize [0.7, 1.3]
-        (rand_H, rand_W) = np.random.randint(7,13,2)
-        new_size = [ tf.cast(input_shape[1] * rand_H / 10, tf.int32), tf.cast(input_shape[2] * rand_W / 10, tf.int32) ]
-        label = tf.image.resize_images(label, new_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        image = tf.image.resize_images(image, new_size, tf.image.ResizeMethod.BILINEAR)
-        label = tf.cast(label, tf.float32) #NOTE, image is already normalized, cannot be converted to tf.int32
-        stacked = tf.concat([image, label], axis=-1)
-        # randomly crop and flip
-        stacked = tf.random_crop(stacked, [input_shape[0], 504, 504, 6])
-        stacked = tf.squeeze(stacked)
-        stacked = tf.image.random_flip_left_right(stacked)
-        stacked = tf.reshape(stacked, [input_shape[0], 504, 504, 6])
-        image = stacked[:, :, :, :3]
-        label = stacked[:, :, :, 3:4]
-        label = tf.cast(label, tf.int32) #NOTE, [1,504,504,1]
-
         model = self._build_model(image, is_train=True)
-        pred = model['semantic'] #NOTE, pred is [1, 63,63,19]
+        pred = model['semantic'] #NOTE, pred is [batch_size, 19,63,63]
 
-        pre_shape = tf.shape(pred) #NOTE, [1,63,63,19]
-        new_shape = [pre_shape[0], pre_shape[1]*pre_shape[2], self._num_classes]
-        pred = tf.reshape(pred, new_shape)
+        new_shape = [params['batch_size'], self._num_classes, 63*63]
+        pred = tf.reshape(pred, new_shape) #NOTE: [batch_size, 19, 63*63]
 
-        # resize label to [1, H/8, W/8], then strech to a vector [1, H/8 * W/8]
-        #new_size = [old_shape[1]/8, old_shape[2]/8]
-        new_size = [pre_shape[1], pre_shape[2]]
-        new_size = tf.cast(new_size, tf.int32)
-        label = tf.image.resize_images(label, new_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        new_shape = [pre_shape[0], new_size[0]*new_size[1]]
-        label = tf.reshape(label, new_shape) #NOTE, lable is [1, 63*63]
+        label = tf.image.resize_images(label, [63,63], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        if self._data_format == 'NCHW':
+            pred = tf.transpose(pred, [0, 2, 1]) #NOTE, label is [batch_size, 63*63,19]
+        label = tf.reshape(label, [params['batch_size'] ,63*63]) #NOTE, label is [batch_size, 63*63]
         # NOTE: the void number is 19, car is 13
         void_bool = tf.equal(label, 19)
         valid_bool = tf.logical_not(void_bool)
@@ -218,11 +200,11 @@ class ResNet38:
 
         loss_sem = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_label, logits=valid_pred))
         loss_total = loss_sem + self._weight_decay(params['decay_rate'])
-        # NOTE: don't update BN moving mean and moving var, however train BN gamma and beta
+        # NOTE: don't update BN moving mean and moving var of shared layers, however train BN gamma and beta.
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
-            train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
-            #train_step = tf.train.MomentumOptimizer(params['lr'],0.9).minimize(loss_total)
+            # train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
+            train_step = tf.train.MomentumOptimizer(params['lr'],0.9).minimize(loss_total)
 
         return train_step, loss_total
 
@@ -233,6 +215,8 @@ class ResNet38:
 
         model = self._build_model(image, is_train=False)
         pred = model['semantic']
+        if self._data_format == 'NCHW':
+            pred = tf.transpose(pred, [0,2,3,1]) #NOTE: [batch_size, H, W, 19]
         upsampled_pred = self._upsample(pred, [1024,2048])
 
         ## Predict class label: [batch, H, W, C]

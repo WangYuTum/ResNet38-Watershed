@@ -9,63 +9,59 @@ import tensorflow as tf
 import data_utils as dt
 from core import resnet38
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
-train_data_params = {'data_dir': '../data/CityDatabase',
-                     'dataset': 'train_sem',
-                     'batch_size': 1}
-dataset = dt.CityDataSet(train_data_params)
+# Prepare dataset
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+train_data_params = {'mode': 'train_sem',
+                     'batch_size': 3}
+# The data pipeline should be on CPU
+with tf.device('/cpu:0'):
+    CityData = dt.CityDataSet(train_data_params)
+    next_batch = CityData.next_batch()
 
-## NOTE learning rate, optimizer
+# Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/watershed_preimgneta1_grad8s_up_ep9.npy',
-                'batch_size': 1,
+                'feed_weight': '../data/saved_weights/sem2_adam_batch3_stage2/watershed_precitya1_8s_ep15.npy',
+                'batch_size': 3,
                 'decay_rate': 0.0005,
-                'lr': 1e-5,
+                'lr': 0.0008,
+                'data_format': "NCHW", # optimal for cudnn
                 'save_path': '../data/saved_weights/',
                 'tsboard_save_path': '../data/tsboard/'}
-
-train_ep = 31
-save_ep = 3
+train_ep = 46
+save_ep = 5
 num_train = 2975
 
+# Build network
+# This part should be on GPU
+res38 = resnet38.ResNet38(model_params)
+[train_op, loss] = res38.train_sem(image=next_batch['img'], label=next_batch['sem_gt'], params=model_params)
+save_dict_op = res38._var_dict
+TrainLoss_sum = tf.summary.scalar('train_loss', loss)
+Train_summary = tf.summary.merge_all()
+init = tf.global_variables_initializer()
+
 with tf.Session() as sess:
-    res38 = resnet38.ResNet38(model_params)
     save_path = model_params['save_path']
     batch_size = model_params['batch_size']
+    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'sem2/adam_batch3_stage2/', sess.graph)
 
-    train_img = tf.placeholder(tf.float32, shape=[batch_size, 1024, 2048, 3])
-    train_label = tf.placeholder(tf.int32, shape=[batch_size, 1024, 2048, 3])
-    [train_op, loss] = res38.train_sem(image=train_img, label=train_label, params=model_params)
-
-    save_dict_op = res38._var_dict
-    TrainLoss_sum = tf.summary.scalar('train_loss', loss)
-    Train_summary = tf.summary.merge_all()
-    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'grad-sem0', sess.graph)
-    init = tf.global_variables_initializer()
     sess.run(init)
-
     num_iters = np.int32(num_train / batch_size) + 1
     print('Start training...')
     for epoch in range(train_ep):
         print('Eopch %d'%epoch)
         for iters in range(num_iters):
-            next_images, next_labels = dataset.next_batch() # images [batch_size,H,W,3], labels [batch_size,H,W]
-            # stack labels to [batch_size, H, W, 3] for further processing in train_sem
-            next_labels = np.stack((next_labels, np.zeros((batch_size,1024,2048),np.uint8), np.zeros((batch_size,1024,2048),np.uint8)),axis=-1)
-            train_feed_dict = {train_img: next_images, train_label: next_labels}
-            [train_op_, loss_, Train_summary_] = sess.run([train_op, loss, Train_summary], train_feed_dict)
+            [train_op_, loss_, Train_summary_] = sess.run([train_op, loss, Train_summary])
             writer.add_summary(Train_summary_, iters)
-            if iters % 10 == 0 and iters !=0:
+            if iters % 10 == 0:
                 print('Iter {} loss: {}'.format(iters, loss_))
         if epoch % save_ep == 0 and epoch !=0:
             print('Save trained weight after epoch: %d'%epoch)
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = 'watershed_pregrada1_sem8s_ep%d.npy'%(epoch)
+                save_name = '/sem2_adam_batch3_stage2/watershed_precitya1_8s_ep%d.npy'%(epoch+15)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
-        # TODO: Shuffle dataset
-        # dataset.shuffle()
 
 
