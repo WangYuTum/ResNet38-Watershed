@@ -225,8 +225,8 @@ class ResNet38:
         product = tf.maximum(product, -0.99)
         product = tf.minimum(product, 0.99)
         cos_out = tf.acos(product)
-        sem_gt = tf.reshape(sem_gt, [params['batch_size'],64,128]) #NOTE sem_gt [batch_size, 64,128]
-        bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [batch_size, 64,128]
+        sem_gt = tf.reshape(sem_gt, [params['batch_size'],64,128]) #NOTE sem_gt [batch_size,64,128]
+        bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [batch_size,64,128]
         # if no label is 13, set loss to 0.0
         valid_cos_out = tf.cond(tf.equal(tf.reduce_sum(tf.cast(bool_mask, tf.int32)), 0), lambda: 0.0, lambda: tf.boolean_mask(cos_out, bool_mask))
         loss_grad = tf.reduce_mean(tf.square(valid_cos_out))
@@ -236,6 +236,11 @@ class ResNet38:
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
+            # train_step = tf.train.MomentumOptimizer(params['lr'],0.9).minimize(loss_total)
+
+        ###
+        pred_out_sum = tf.summary.image('pred_out', tf.concat([pred, tf.zeros([params['batch_size'], 64, 128, 1])], axis=-1))
+        ###
 
         return train_step, loss_total
 

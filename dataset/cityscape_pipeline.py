@@ -185,7 +185,6 @@ class CityDataSet():
             Return: a dictionary, where RGB_image and sem_gt/grad_gt is transformed
 
             Transformation:
-                * Randomly flip image/sem_gt/grad_gt together
                 * Resize image to [512, 1024] fit TitanX 12GB memory
                 * Resize sem_gt/grad_gt by 1/(2*8) for loss calculation, [64,128]
             After this transformation:
@@ -193,18 +192,14 @@ class CityDataSet():
                 * sem_gt has shape: [64,128,1], tf.int32
                 * grad_gt has shape: [64,128,2], tf.float32
         '''
-        # Randomly flip
-        sem_gt = tf.cast(example['sem_gt'], tf.float32)
-        stacked = tf.concat([example['img'], sem_gt, example['grad_gt']], axis=-1) #NOTE, shape [H, W, 6]
-        stacked = tf.image.random_flip_left_right(stacked)
-
-        image = tf.image.resize_images(stacked[:,:,0:3], [512,1024], tf.image.ResizeMethod.BILINEAR)
-        sem_gt = tf.image.resize_images(stacked[:,:,3:4], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        grad_gt = tf.image.resize_images(stacked[:,:,4:6], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        ##NOTE: MUST no random flip.
+        # Resize
+        image = tf.image.resize_images(example['img'], [512,1024], tf.image.ResizeMethod.BILINEAR)
+        sem_gt = tf.image.resize_images(example['sem_gt'], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        grad_gt = tf.image.resize_images(example['grad_gt'], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
 
         # Pack the result
-        sem_gt = tf.cast(sem_gt, tf.int32)
         transformed = {}
         transformed['img'] = image
         transformed['sem_gt'] = sem_gt
@@ -256,9 +251,9 @@ class CityDataSet():
         '''
         dataset = tf.contrib.data.TFRecordDataset(TFrecord_file, "GZIP")
         dataset = dataset.repeat()
-        dataset = dataset.map(self._parse_single_record, num_threads=2, output_buffer_size=8)
-        dataset = dataset.map(self._image_standardization, num_threads=2, output_buffer_size=8)
-        dataset = dataset.map(self._grad_train_transform, num_threads=2, output_buffer_size=8)
+        dataset = dataset.map(self._parse_single_record, num_threads=3, output_buffer_size=9)
+        dataset = dataset.map(self._image_standardization, num_threads=3, output_buffer_size=9)
+        dataset = dataset.map(self._grad_train_transform, num_threads=3, output_buffer_size=9)
         dataset = dataset.shuffle(buffer_size=1500)
         dataset = dataset.batch(self._batch_size)
 
