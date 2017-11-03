@@ -185,9 +185,9 @@ class CityDataSet():
         '''
         dataset = tf.contrib.data.TFRecordDataset(TFrecord_file, "GZIP")
         dataset = dataset.repeat()
-        dataset = dataset.map(self._parse_single_record, num_threads=3, output_buffer_size=9)
-        dataset = dataset.map(self._image_standardization, num_threads=3, output_buffer_size=9)
-        dataset = dataset.map(self._sem_train_transform, num_threads=3, output_buffer_size=9)
+        dataset = dataset.map(self._parse_single_record, num_threads=4, output_buffer_size=12)
+        dataset = dataset.map(self._image_standardization, num_threads=4, output_buffer_size=12)
+        dataset = dataset.map(self._sem_train_transform, num_threads=4, output_buffer_size=12)
         dataset = dataset.shuffle(buffer_size=1500)
         dataset = dataset.batch(self._batch_size)
 

@@ -8,13 +8,13 @@ import numpy as np
 import tensorflow as tf
 import data_utils as dt
 from core import resnet38
-from eval import evalPixelSemantic
+# from eval import evalPixelSemantic
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '2'
 config_gpu = tf.ConfigProto()
 config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.9
 test_data_params = {'mode': 'val_sem',
-                     'batch_size': 2}
+                     'batch_size': 4}
 
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
@@ -23,14 +23,14 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/sem2_momen_batch4/watershed_preimgneta1_8s_ep30.npy',
-                'batch_size': 2,
+                'feed_weight': '../data/saved_weights/sem2_momen_batch4/watershed_precitya1_8s_ep140.npy',
+                'batch_size': 4,
                 'data_format': "NCHW", # optimal for cudnn
                 }
 
 num_val = 500
 num_test = 1525
-iterations = 2
+iterations = int(num_val / model_params['batch_size'])
 
 res38 = resnet38.ResNet38(model_params)
 predict = res38.inf(image=next_batch['img'])
@@ -48,10 +48,10 @@ with tf.Session(config=config_gpu) as sess:
         pred_out = sess.run(predict) #NOTE: [batch_size, 1024, 2048]
         CityData.save_trainID_img(pred_out)
 
-    print("Inference done! Start transforming to colored ...")
-    CityData.pred_to_color()
-    # print("Start transforming to labelIDs ...")
-    # dataset.pred_to_labelID()
+    # print("Inference done! Start transforming to colored ...")
+    # CityData.pred_to_color()
+    print("Start transforming to labelIDs ...")
+    CityData.pred_to_labelID()
     # print("Start evaluating accuracy ...")
     # accuracy = evalPixelSemantic.run_eval(test_data_params['labelIDs_save_path'])
     # print("Final score {}".format(accuracy))

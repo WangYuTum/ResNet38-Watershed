@@ -163,6 +163,33 @@ class ResNet38:
 
         return tf.multiply(decay_rate, tf.add_n(l2_losses))
 
+    def _lr_scheduler(self, params, now_iter):
+        '''
+        Given:
+            - learning rate type: {fixed, linear_decay}
+            - lr: the base learning rate
+            - max_updates
+            - stop_lr
+            - offset
+            - now_iter: The current iteration number, given by a placeholder
+        Returns: the scheduled learning rate.
+
+            lr = base_lr * (1-now_iter/max_updates)
+        '''
+        if params['lr_schedule'] == "fixed":
+            return params['lr']
+        elif params['lr_schedule'] == "linear_decay":
+           now_update = params['offset'] + now_iter
+           # if exceeds the maximum update numbers
+           now_update = tf.cond(tf.greater(now_update, params['max_updates']), lambda: params['max_updates'], lambda: now_update)
+           lr = params['lr'] * (1.0 - tf.cast(now_update, tf.float32) / params['max_updates'])
+           # if lr less than stop_lr, set lr to stop_lr
+           lr = tf.cond(tf.logical_and(tf.greater(params['stop_lr'], 0.), tf.less(lr, params['stop_lr'])), lambda: params['stop_lr'], lambda: lr)
+
+           return lr
+        else:
+            sys.exit('Invalid lr scheduler!')
+
     def num_parameters(self):
         '''Compute the number of trainable parameters. Note that it MUST be called after the graph is built'''
 
@@ -174,7 +201,7 @@ class ResNet38:
              # default learning rate for Adam: 0.001
              # train_op = tf.train.AdamOptimizer().minimize(total_loss)
 
-    def train_sem(self, image, label, params):
+    def train_sem(self, image, label, params, now_iter):
         ''' This function only trains semantic branch.
             Input: Image [batch_size, 504, 504, 3]
                    Label [batch_size, 504, 504, 1]
@@ -200,11 +227,14 @@ class ResNet38:
 
         loss_sem = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_label, logits=valid_pred))
         loss_total = loss_sem + self._weight_decay(params['decay_rate'])
+
+        # set learning rate
+        lr = self._lr_scheduler(params, now_iter)
         # NOTE: don't update BN moving mean and moving var of shared layers, however train BN gamma and beta.
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
             # train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
-            train_step = tf.train.MomentumOptimizer(params['lr'],0.9).minimize(loss_total)
+            train_step = tf.train.MomentumOptimizer(lr,0.9).minimize(loss_total)
 
         return train_step, loss_total
 

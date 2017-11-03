@@ -15,12 +15,21 @@ Semantic(BN+2convs, rate=12) -> Softmax
 ## Results
 
 - Unified watershed semantic branch which implements semantic segmentation.
-- Pretrained result: 62.3%
-- Best accuracy on semantic: ??
+- Pretrain weights: from imgnet.
+- Best accuracy on semantic: 66.76%
 - Data set: 2975 training image(1024x2048). 500 val images(not used for training). 1525 test images(without GT) 
-- Data augmentation: Per image standardization (adapted from MXnet implementation). Randomly crop per image. Per epoch randomly shuffle?
-- Training: Train 30 epochs. Batch 1. Adam optimizer(rate=0.001). L2 weight decay 0.0005.
-- Device: TitanX(Pascal) 12GB
+- Data augmentation: 
+	- Per image standardization (adapted from MXnet implementation). 
+	- Randomly resize with a ratio [0.7, 1.3], preserve original height-weight ratio. 
+	- Randomly crop to [504,504].
+	- Randomly shuffle.
+	- Batch 4
+- Training: 
+	- Stage1: Train 150 epochs. Batch 4. Momentum optimizer(lr=0.0016, momentum=0.9, fixed). L2 weight decay 0.0005. Init from imgnet.
+	  - Acc: 66.76%. (66.23% for 140 epoches)
+	- Stage2: Train 64 epochs. Batch 4. Momentum optimizer(lr=0.0008, momentum=0.9, linear). L2 weight decay 0.0005. Init from stage1. 
+	  - Acc: ??
+- Device: Quadro P6000 24GB
 
 ## Acknowledge
 
@@ -28,12 +37,13 @@ Thanks for the GPU provided by [Computer Vision and Pattern Recongnition Group a
 
 ## TODO
 
-- BN: use multi-batch!
-- BN: train using moving statistic or batch statistic?
-- BN: train update moving statistic or not? update gamma/beta or not?
+- Stage1 loss could be further reduced.
 
 ## NOTES
 
-- train using local batch statistic, update moving statistic, Adam(lr=0.001, 15 epoch) -> ??
-- train using local batch statistic, no update moving statistic, Adam(lr=0.001, 15 epoch) -> ??
+- BN params: 
+	- Do not update moving statistics of shared conv layers, but update gamma/betas.
+	- Do update moving statistics and gamma/betas of semantic unique parts.
 
+- Batch Size:
+	- Batch 4 is much better than batch 3, though batch 3 might achieve a lower loss.

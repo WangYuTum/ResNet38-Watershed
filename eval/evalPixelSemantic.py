@@ -35,7 +35,7 @@ try:
 except ImportError:
     izip = zip
 
-from eval.csHelpers import *
+from csHelpers import *
 
 CSUPPORT = True
 if CSUPPORT:
@@ -537,4 +537,12 @@ def run_eval(resultPath):
 
 	return avgScore
 
+def main():
 
+    score = 0.0
+    score = run_eval(None)
+
+    print('Final accuracy is {0}'.format(score))
+
+if __name__ == "__main__":
+    main()
