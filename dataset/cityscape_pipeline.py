@@ -224,7 +224,6 @@ class CityDataSet():
             Return: a dictionary, where RGB_image and sem_gt/wt_gt is transformed
 
             Transformation:
-                * Randomly flip image/sem_gt/wt_gt together
                 * Assign each discretized value a weight as in the paper: c_k
                 * Resize image to [512, 1024] fit TitanX 12GB memory
                 * Resize sem_gt/wt_gt by 1/(2*8) for loss calculation, [64,128]
@@ -235,28 +234,23 @@ class CityDataSet():
                     * The 1st channel is discretized values: [0,15]
                     * The 2nd channel is the weights c_k
         '''
-        # Randomly flip
-        sem_gt = tf.cast(example['sem_gt'], tf.float32)
-        wt_gt = tf.cast(example['wt_gt'], tf.float32)
-        stacked = tf.concat([example['img'], sem_gt, wt_gt], axis=-1) #NOTE, shape [H, W, 5]
-        stacked = tf.image.random_flip_left_right(stacked)
+        wt_gt0 = tf.cast(example['wt_gt'], tf.float32)
 
         # Assign weight to each discretized value: c_k
         ## There're 16 discretized values [0,15]. The assignment looks like the following:
         ## x + 2x + 3x + ... + 16x = 1, x = 1/136
         ## Therefore, the 0-level corresponds to a weight of 16*x, 1-level corresponds to 15*x
-        wt_gt = stacked[:,:,4:5] - 16.0
+        wt_gt = wt_gt0 - 16.0
         wt_gt = tf.abs(wt_gt)
         wt_gt = tf.multiply(wt_gt, 1.0/136.0)
-        wt_gt = tf.concat([stacked[:,:,4:5], wt_gt], axis=-1)
+        wt_gt = tf.concat([wt_gt0, wt_gt], axis=-1)
 
         # Resize
-        image = tf.image.resize_images(stacked[:,:,0:3], [512,1024], tf.image.ResizeMethod.BILINEAR)
-        sem_gt = tf.image.resize_images(stacked[:,:,3:4], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        image = tf.image.resize_images(example['img'], [512,1024], tf.image.ResizeMethod.BILINEAR)
+        sem_gt = tf.image.resize_images(example['sem_gt'], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         wt_gt = tf.image.resize_images(wt_gt, [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
         # Pack the result
-        sem_gt = tf.cast(sem_gt, tf.int32)
         transformed = {}
         transformed['img'] = image
         transformed['sem_gt'] = sem_gt

@@ -138,21 +138,44 @@ class ResNet38:
         # Gating operation, need semantic GT while training and inference
         model['gated_feat'] = self._gate(sem_gt, model['B7'])
 
-        with tf.variable_scope("wt"):
+        with tf.variable_scope("graddir"):
             # Further feature extractors
-            shape_dict['wt_convs1'] = [[3,3,4096,512],[3,3,512,16]]
+            shape_dict['grad_convs1'] = [[3,3,4096,512],[3,3,512,512]]
             with tf.variable_scope('convs1'):
-                model['wt_convs1'] = nn.ResUnit_tail(self._data_format, model['gated_feat'], feed_dict,
-                                                     shape_dict['wt_convs1'], var_dict)
-                #model['wt_convs1'] = nn.grad_convs(self._data_format, model['gated_feat'], feed_dict,
+                #model['wt_convs1'] = nn.ResUnit_tail(self._data_format, model['gated_feat'], feed_dict,
                 #                                     shape_dict['wt_convs1'], var_dict)
+                model['grad_convs1'] = nn.grad_convs(self._data_format, model['gated_feat'], feed_dict,
+                                                     shape_dict['grad_convs1'], var_dict)
             # The normalize the output as the magnitued of GT
-            #shape_dict['grad_convs2'] = [[1,1,512,256],[1,1,256,256],[1,1,256,2]]
-            #with tf.variable_scope('convs2'):
-            #    model['grad_convs2'] = nn.grad_norm(self._data_format, model['grad_convs1'], feed_dict,
-            #                                        shape_dict['grad_convs2'], var_dict)
+            shape_dict['grad_convs2'] = [[1,1,512,256],[1,1,256,256],[1,1,256,2]]
+            with tf.variable_scope('convs2'):
+                model['grad_convs2'] = nn.grad_norm(self._data_format, model['grad_convs1'], feed_dict,
+                                                    shape_dict['grad_convs2'], var_dict)
             # Normalize the output to have unit vectors
             #model['grad_norm'] = nn.norm(self._data_format, model['grad_convs2'])
+
+        with tf.variable_scope('wt'):
+            # Further featrue extractors
+            shape_dict['wt_convs1'] = [3,3,2,64]
+            with tf.variable_scope('convs1'):
+                model['wt_convs1'] = nn.WT_B0(self._data_format, model['grad_convs2'], feed_dict,
+                                             shape_dict['wt_convs1'], var_dict)
+            shape_dict['wt_convs2'] = [[3,3,64,128],[3,3,128,128],[1,1,64,128]]
+            with tf.variable_scope('convs2'):
+                model['wt_convs2'] = nn.WT_Block(self._data_format, model['wt_convs1'], feed_dict,
+                                             shape_dict['wt_convs2'], var_dict)
+            shape_dict['wt_convs3'] = [[3,3,128,256],[3,3,256,256],[1,1,128,256]]
+            with tf.variable_scope('convs3'):
+                model['wt_convs3'] = nn.WT_Block(self._data_format, model['wt_convs2'], feed_dict,
+                                              shape_dict['wt_convs3'], var_dict)
+            shape_dict['wt_convs4'] = [[3,3,256,512],[3,3,512,512],[1,1,256,512]]
+            with tf.variable_scope('convs4'):
+                model['wt_convs4'] = nn.WT_Block(self._data_format, model['wt_convs3'], feed_dict,
+                                              shape_dict['wt_convs4'], var_dict)
+            shape_dict['wt_tail'] = [[3,3,512,512],[3,3,512,16]]
+            with tf.variable_scope('tail'):
+                model['wt_tail'] = nn.WT_tail(self._data_format, model['wt_convs4'], feed_dict,
+                                              shape_dict['wt_tail'], var_dict)
 
         return model
 
@@ -221,7 +244,15 @@ class ResNet38:
 
         ## Get prediction prepared
         model = self._build_model(image, sem_gt, is_train=True)
-        pred = model['wt_convs1'] #NOTE pred  [batch_size, 16, 64,128] if "NCHW"
+        pred = model['wt_tail'] #NOTE pred  [batch_size, 16, 64,128] if "NCHW"
+
+        ### TFBoard summary
+        summ_pred = tf.argmax(tf.nn.softmax(tf.transpose(pred, [0, 2, 3, 1])), axis=3)
+        summ_pred = tf.expand_dims(summ_pred, axis=-1)
+        summ_pred = tf.cast(summ_pred, tf.float16)
+        pred_sum_op = tf.summary.image('pred_out', summ_pred)
+        ###
+
         pred = tf.reshape(pred, [params['batch_size'], 16, 64*128]) #NOTE: pred [batch_size, 16, 64*128] if "NCHW"
         if self._data_format == 'NCHW':
             pred = tf.transpose(pred, [0, 2, 1]) #NOTE, pred [batch_size, 64*128, 16]

@@ -20,10 +20,10 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/trained_weights/pretrained_ResNet38a1_imgnet.npy',
+                'feed_weight': '../data/saved_weights/grad2_adam_batch3/watershed_preimgneta1_grad8s_ep27.npy',
                 'batch_size': 1,
                 'decay_rate': 0.0005,
-                'lr': 0.0016,
+                'lr': 0.00005,
                 'data_format': "NCHW", # optimal for cudnn
                 'save_path': '../data/saved_weights/',
                 'tsboard_save_path': '../data/tsboard/'}
@@ -36,6 +36,12 @@ num_train = 2975
 res38 = resnet38.ResNet38(model_params)
 [train_op, loss] = res38.train_wt(image=next_batch['img'], sem_gt=next_batch['sem_gt'],
                                    wt_gt=next_batch['wt_gt'], params=model_params)
+###
+input_img_sum = tf.summary.image('input_img', next_batch['img'])
+input_img_sum = tf.summary.image('input_sem', tf.cast(next_batch['sem_gt'], tf.float16))
+input_wt_sum = tf.summary.image('input_wt', next_batch['wt_gt'][:,:,:,0:1])
+###
+
 save_dict_op = res38._var_dict
 TrainLoss_sum = tf.summary.scalar('train_loss', loss)
 Train_summary = tf.summary.merge_all()
@@ -61,7 +67,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/wt_adam_batch1/watershed_preimgneta1_wt8s_ep%d.npy'%(epoch)
+                save_name = '/wt_adam_batch1/watershed_pregradsa1_wt8s_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 

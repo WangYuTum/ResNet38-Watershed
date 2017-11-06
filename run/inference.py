@@ -24,7 +24,7 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/wt_adam_batch1/watershed_preimgneta1_wt8s_ep5.npy',
+                'feed_weight': '../data/saved_weights/wt_adam_batch1/watershed_pregradsa1_wt8s_ep18.npy',
                 'batch_size': 2,
                 'data_format': "NCHW", # optimal for cudnn
                 }
