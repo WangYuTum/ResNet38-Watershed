@@ -27,8 +27,8 @@ Semantic(BN+2convs, rate=12) -> Softmax
 - Training: 
 	- Stage1: Train 150 epochs. Batch 4. Momentum optimizer(lr=0.0016, momentum=0.9, fixed). L2 weight decay 0.0005. Init from imgnet.
 	  - Acc: 66.76%. (66.23% for 140 epoches)
-	- Stage2: Train 64 epochs. Batch 4. Momentum optimizer(lr=0.0008, momentum=0.9, linear). L2 weight decay 0.0005. Init from stage1. 
-	  - Acc: ??
+	- Stage2: Train 65 epochs. Batch 4. Momentum optimizer(lr=0.0008, momentum=0.9, linear). L2 weight decay 0.0005. Init from stage1. 
+	  - Acc: 72.04%
 - Device: Quadro P6000 24GB
 
 ## Acknowledge
