@@ -22,7 +22,7 @@ class ResNet38:
 
         self._num_classes = params.get('num_classes', 19)
 
-    def _build_model(self, image, sem_gt, is_train=False):
+    def _build_model(self, grad_gt, sem_gt, is_train=False):
         '''If is_train, save weight to self._var_dict,
            otherwise, don't save weights
            '''
@@ -39,140 +39,156 @@ class ResNet38:
             dropout = False
 
         if self._data_format == "NCHW":
-            image = tf.transpose(image, [0, 3, 1, 2])
+            # image = tf.transpose(image, [0, 3, 1, 2])
             sem_gt = tf.transpose(sem_gt, [0, 3, 1, 2])
+            grad_gt = tf.transpose(grad_gt, [0, 3, 1, 2])
 
-        shape_dict = {}
-        shape_dict['B0'] = [3,3,3,64]
+#        shape_dict = {}
+#        shape_dict['B0'] = [3,3,3,64]
 
         # The sharable conv features: 36 conv layers
-        with tf.variable_scope('shared'):
-            # B0: [H,W,3] -> [H,W,64]
-            with tf.variable_scope('B0'):
-                model['B0'] = nn.conv_layer(self._data_format, image, feed_dict, 1, 'SAME',
-                                            shape_dict['B0'], var_dict)
-
-            # B2_1: [H,W,64] -> [H/2, W/2, 128]
-            shape_dict['B2'] = {}
-            shape_dict['B2']['side'] = [1,1,64,128]
-            shape_dict['B2']['convs'] = [[3,3,64,128],[3,3,128,128]]
-            with tf.variable_scope('B2_1'):
-                model['B2_1'] = nn.ResUnit_downsample_2convs(self._data_format, model['B0'],
-                                                             feed_dict,
-                                                             shape_dict['B2'],
-                                                             var_dict=var_dict)
-            # B2_2, B2_3: [H/2, W/2, 128]
-            for i in range(2):
-                with tf.variable_scope('B2_'+str(i+2)):
-                    model['B2_'+str(i+2)] = nn.ResUnit_2convs(self._data_format, model['B2_'+str(i+1)], feed_dict,
-                                                              shape_dict['B2']['convs'][1],
-                                                              var_dict=var_dict)
-
-            # B3_1: [H/2, W/2, 128] -> [H/4, W/4, 256]
-            shape_dict['B3'] = {}
-            shape_dict['B3']['side'] = [1,1,128,256]
-            shape_dict['B3']['convs'] = [[3,3,128,256],[3,3,256,256]]
-            with tf.variable_scope('B3_1'):
-                model['B3_1'] = nn.ResUnit_downsample_2convs(self._data_format, model['B2_3'],
-                                                             feed_dict,
-                                                             shape_dict['B3'],
-                                                             var_dict=var_dict)
-            # B3_2, B3_3: [H/4, W/4, 256]
-            for i in range(2):
-                with tf.variable_scope('B3_'+str(i+2)):
-                    model['B3_'+str(i+2)] = nn.ResUnit_2convs(self._data_format, model['B3_'+str(i+1)], feed_dict,
-                                                              shape_dict['B3']['convs'][1],
-                                                              var_dict=var_dict)
-            # B4_1: [H/4, W/4, 256] -> [H/8, W/8, 512]
-            shape_dict['B4'] = {}
-            shape_dict['B4']['side'] = [1,1,256,512]
-            shape_dict['B4']['convs'] = [[3,3,256,512],[3,3,512,512]]
-            with tf.variable_scope('B4_1'):
-                model['B4_1'] = nn.ResUnit_downsample_2convs(self._data_format, model['B3_3'],
-                                                                 feed_dict,
-                                                                 shape_dict['B4'],
-                                                                 var_dict=var_dict)
-            # B4_2 ~ B4_6: [H/8, W/8, 512]
-            for i in range(5):
-                with tf.variable_scope('B4_'+str(i+2)):
-                    model['B4_'+str(i+2)] = nn.ResUnit_2convs(self._data_format, model['B4_'+str(i+1)],
-                                                                   feed_dict,
-                                                                   shape_dict['B4']['convs'][1],
-                                                                   var_dict=var_dict)
-            # B5_1: [H/8, W/8, 512] -> [H/8, W/8, 1024]
-            shape_dict['B5_1'] = {}
-            shape_dict['B5_1']['side'] = [1,1,512,1024]
-            shape_dict['B5_1']['convs'] = [[3,3,512,512],[3,3,512,1024]]
-            with tf.variable_scope('B5_1'):
-                model['B5_1'] = nn.ResUnit_hybrid_dilate_2conv(self._data_format, model['B4_6'],
-                                                                   feed_dict,
-                                                                   shape_dict['B5_1'],
-                                                                   var_dict=var_dict)
-            # B5_2, B5_3: [H/8, W/8, 1024]
-            # Shape for B5_2, B5_3
-            shape_dict['B5_2_3'] = [[3,3,1024,512],[3,3,512,1024]]
-            for i in range(2):
-                with tf.variable_scope('B5_'+str(i+2)):
-                    model['B5_'+str(i+2)] = nn.ResUnit_full_dilate_2convs(self._data_format, model['B5_'+str(i+1)],
-                                                      feed_dict, shape_dict['B5_2_3'],
-                                                      var_dict=var_dict)
-
-            # B6: [H/8, W/8, 1024] -> [H/8, W/8, 2048]
-            shape_dict['B6'] = [[1,1,1024,512],[3,3,512,1024],[1,1,1024,2048]]
-            with tf.variable_scope('B6'):
-                model['B6'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B5_3'],
-                                                                 feed_dict,
-                                                                 shape_dict['B6'],
-                                                                 dropout=dropout,
-                                                                 var_dict=var_dict)
-            # B7: [H/8, W/8, 2048] -> [H/8, W/8, 4096]
-            shape_dict['B7'] = [[1,1,2048,1024],[3,3,1024,2048],[1,1,2048,4096]]
-            with tf.variable_scope('B7'):
-                model['B7'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B6'],
-                                                                 feed_dict,
-                                                                 shape_dict['B7'],
-                                                                 dropout=dropout,
-                                                                 var_dict=var_dict)
-
-        # The wt unique part:
-        # Gating operation, need semantic GT while training and inference
-        model['gated_feat'] = self._gate(sem_gt, model['B7'])
-
-        with tf.variable_scope("graddir"):
-            # Further feature extractors
-            shape_dict['grad_convs1'] = [[3,3,4096,512],[3,3,512,512]]
-            with tf.variable_scope('convs1'):
-                #model['wt_convs1'] = nn.ResUnit_tail(self._data_format, model['gated_feat'], feed_dict,
-                #                                     shape_dict['wt_convs1'], var_dict)
-                model['grad_convs1'] = nn.grad_convs(self._data_format, model['gated_feat'], feed_dict,
-                                                     shape_dict['grad_convs1'], var_dict)
-            # The normalize the output as the magnitued of GT
-            shape_dict['grad_convs2'] = [[1,1,512,256],[1,1,256,256],[1,1,256,2]]
-            with tf.variable_scope('convs2'):
-                model['grad_convs2'] = nn.grad_norm(self._data_format, model['grad_convs1'], feed_dict,
-                                                    shape_dict['grad_convs2'], var_dict)
-            # Normalize the output to have unit vectors
-            #model['grad_norm'] = nn.norm(self._data_format, model['grad_convs2'])
-
+#        with tf.variable_scope('shared'):
+#            # B0: [H,W,3] -> [H,W,64]
+#            with tf.variable_scope('B0'):
+#                model['B0'] = nn.conv_layer(self._data_format, image, feed_dict, 1, 'SAME',
+#                                            shape_dict['B0'], var_dict)
+#
+#            # B2_1: [H,W,64] -> [H/2, W/2, 128]
+#            shape_dict['B2'] = {}
+#            shape_dict['B2']['side'] = [1,1,64,128]
+#            shape_dict['B2']['convs'] = [[3,3,64,128],[3,3,128,128]]
+#            with tf.variable_scope('B2_1'):
+#                model['B2_1'] = nn.ResUnit_downsample_2convs(self._data_format, model['B0'],
+#                                                             feed_dict,
+#                                                             shape_dict['B2'],
+#                                                             var_dict=var_dict)
+#            # B2_2, B2_3: [H/2, W/2, 128]
+#            for i in range(2):
+#                with tf.variable_scope('B2_'+str(i+2)):
+#                    model['B2_'+str(i+2)] = nn.ResUnit_2convs(self._data_format, model['B2_'+str(i+1)], feed_dict,
+#                                                              shape_dict['B2']['convs'][1],
+#                                                              var_dict=var_dict)
+#
+#            # B3_1: [H/2, W/2, 128] -> [H/4, W/4, 256]
+#            shape_dict['B3'] = {}
+#            shape_dict['B3']['side'] = [1,1,128,256]
+#            shape_dict['B3']['convs'] = [[3,3,128,256],[3,3,256,256]]
+#            with tf.variable_scope('B3_1'):
+#                model['B3_1'] = nn.ResUnit_downsample_2convs(self._data_format, model['B2_3'],
+#                                                             feed_dict,
+#                                                             shape_dict['B3'],
+#                                                             var_dict=var_dict)
+#            # B3_2, B3_3: [H/4, W/4, 256]
+#            for i in range(2):
+#                with tf.variable_scope('B3_'+str(i+2)):
+#                    model['B3_'+str(i+2)] = nn.ResUnit_2convs(self._data_format, model['B3_'+str(i+1)], feed_dict,
+#                                                              shape_dict['B3']['convs'][1],
+#                                                              var_dict=var_dict)
+#            # B4_1: [H/4, W/4, 256] -> [H/8, W/8, 512]
+#            shape_dict['B4'] = {}
+#            shape_dict['B4']['side'] = [1,1,256,512]
+#            shape_dict['B4']['convs'] = [[3,3,256,512],[3,3,512,512]]
+#            with tf.variable_scope('B4_1'):
+#                model['B4_1'] = nn.ResUnit_downsample_2convs(self._data_format, model['B3_3'],
+#                                                                 feed_dict,
+#                                                                 shape_dict['B4'],
+#                                                                 var_dict=var_dict)
+#            # B4_2 ~ B4_6: [H/8, W/8, 512]
+#            for i in range(5):
+#                with tf.variable_scope('B4_'+str(i+2)):
+#                    model['B4_'+str(i+2)] = nn.ResUnit_2convs(self._data_format, model['B4_'+str(i+1)],
+#                                                                   feed_dict,
+#                                                                   shape_dict['B4']['convs'][1],
+#                                                                   var_dict=var_dict)
+#            # B5_1: [H/8, W/8, 512] -> [H/8, W/8, 1024]
+#            shape_dict['B5_1'] = {}
+#            shape_dict['B5_1']['side'] = [1,1,512,1024]
+#            shape_dict['B5_1']['convs'] = [[3,3,512,512],[3,3,512,1024]]
+#            with tf.variable_scope('B5_1'):
+#                model['B5_1'] = nn.ResUnit_hybrid_dilate_2conv(self._data_format, model['B4_6'],
+#                                                                   feed_dict,
+#                                                                   shape_dict['B5_1'],
+#                                                                   var_dict=var_dict)
+#            # B5_2, B5_3: [H/8, W/8, 1024]
+#            # Shape for B5_2, B5_3
+#            shape_dict['B5_2_3'] = [[3,3,1024,512],[3,3,512,1024]]
+#            for i in range(2):
+#                with tf.variable_scope('B5_'+str(i+2)):
+#                    model['B5_'+str(i+2)] = nn.ResUnit_full_dilate_2convs(self._data_format, model['B5_'+str(i+1)],
+#                                                      feed_dict, shape_dict['B5_2_3'],
+#                                                      var_dict=var_dict)
+#
+#            # B6: [H/8, W/8, 1024] -> [H/8, W/8, 2048]
+#            shape_dict['B6'] = [[1,1,1024,512],[3,3,512,1024],[1,1,1024,2048]]
+#            with tf.variable_scope('B6'):
+#                model['B6'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B5_3'],
+#                                                                 feed_dict,
+#                                                                 shape_dict['B6'],
+#                                                                 dropout=dropout,
+#                                                                 var_dict=var_dict)
+#            # B7: [H/8, W/8, 2048] -> [H/8, W/8, 4096]
+#            shape_dict['B7'] = [[1,1,2048,1024],[3,3,1024,2048],[1,1,2048,4096]]
+#            with tf.variable_scope('B7'):
+#                model['B7'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B6'],
+#                                                                 feed_dict,
+#                                                                 shape_dict['B7'],
+#                                                                 dropout=dropout,
+#                                                                 var_dict=var_dict)
+#
+#        # The wt unique part:
+#        # Gating operation, need semantic GT while training and inference
+#        model['gated_feat'] = self._gate(sem_gt, model['B7'])
+#
+#        with tf.variable_scope("graddir"):
+#            # Further feature extractors
+#            shape_dict['grad_convs1'] = [[3,3,4096,512],[3,3,512,512]]
+#            with tf.variable_scope('convs1'):
+#                #model['wt_convs1'] = nn.ResUnit_tail(self._data_format, model['gated_feat'], feed_dict,
+#                #                                     shape_dict['wt_convs1'], var_dict)
+#                model['grad_convs1'] = nn.grad_convs(self._data_format, model['gated_feat'], feed_dict,
+#                                                     shape_dict['grad_convs1'], var_dict)
+#            # The normalize the output as the magnitued of GT
+#            shape_dict['grad_convs2'] = [[1,1,512,256],[1,1,256,256],[1,1,256,2]]
+#            with tf.variable_scope('convs2'):
+#                model['grad_convs2'] = nn.grad_norm(self._data_format, model['grad_convs1'], feed_dict,
+#                                                    shape_dict['grad_convs2'], var_dict)
+#            # Normalize the output to have unit vectors
+#            #model['grad_norm'] = nn.norm(self._data_format, model['grad_convs2'])
+#
         with tf.variable_scope('wt'):
-            # Further featrue extractors
-            shape_dict['wt_convs1'] = [3,3,2,64]
+            # Further featrue extractors, no dilations
+            # Input as gated grad-gt: [batch_size, 2, 1024, 2048]
+            grad_gt = nn.norm(self._data_format, grad_gt)
+            model['gated_feat'] = self._gate(sem_gt, grad_gt)
+            shape_dict = {}
+            shape_dict['wt_convs1'] = [3,3,2,8]
             with tf.variable_scope('convs1'):
-                model['wt_convs1'] = nn.WT_B0(self._data_format, model['grad_convs2'], feed_dict,
+                # B0
+                model['wt_convs1'] = nn.WT_B0(self._data_format, model['gated_feat'], feed_dict,
                                              shape_dict['wt_convs1'], var_dict)
-            shape_dict['wt_convs2'] = [[3,3,64,128],[3,3,128,128],[1,1,64,128]]
+            shape_dict['wt_convs2'] = {}
+            shape_dict['wt_convs2']['side'] = [1,1,8,16]
+            shape_dict['wt_convs2']['convs'] = [[3,3,8,16],[3,3,16,16]]
             with tf.variable_scope('convs2'):
-                model['wt_convs2'] = nn.WT_Block(self._data_format, model['wt_convs1'], feed_dict,
-                                             shape_dict['wt_convs2'], var_dict)
-            shape_dict['wt_convs3'] = [[3,3,128,256],[3,3,256,256],[1,1,128,256]]
+                # Downsample, B2
+                model['wt_convs2'] = nn.ResUnit_downsample_2convs(self._data_format, model['wt_convs1'],
+                                                                  feed_dict,
+                                                                  shape_dict['wt_convs2'],
+                                                                  var_dict)
+            shape_dict['wt_convs3'] = {}
+            shape_dict['wt_convs3']['side'] = [1,1,16,32]
+            shape_dict['wt_convs3']['convs'] = [[3,3,16,32],[3,3,32,32]]
             with tf.variable_scope('convs3'):
-                model['wt_convs3'] = nn.WT_Block(self._data_format, model['wt_convs2'], feed_dict,
-                                              shape_dict['wt_convs3'], var_dict)
-            shape_dict['wt_convs4'] = [[3,3,256,512],[3,3,512,512],[1,1,256,512]]
+                # Downsample, B3
+                model['wt_convs3'] = nn.ResUnit_downsample_2convs(self._data_format, model['wt_convs2'],
+                                                                  feed_dict,
+                                                                  shape_dict['wt_convs3'],
+                                                                  var_dict)
+            shape_dict['wt_convs4'] = [[3,3,32,64],[3,3,64,64],[1,1,32,64]]
             with tf.variable_scope('convs4'):
                 model['wt_convs4'] = nn.WT_Block(self._data_format, model['wt_convs3'], feed_dict,
                                               shape_dict['wt_convs4'], var_dict)
-            shape_dict['wt_tail'] = [[3,3,512,512],[3,3,512,16]]
+            shape_dict['wt_tail'] = [[3,3,64,64],[3,3,64,16]]
             with tf.variable_scope('tail'):
                 model['wt_tail'] = nn.WT_tail(self._data_format, model['wt_convs4'], feed_dict,
                                               shape_dict['wt_tail'], var_dict)
@@ -184,8 +200,8 @@ class ResNet38:
             returns gated feature maps, where non-relevant classes on the
             feature maps are set to zero
             Input: sem_input [batch_size, 1, H, W]
-                   feat_input [batch_size, 4096, H, W]
-            Output: gated feature maps [batch_size, H, W, 4096]
+                   feat_input [batch_size, C, H, W]
+            Output: gated feature maps [batch_size, H, W, C]
             NOTE: The default data format is "NCHW", the function also works for "NHWC" without any changes in code.
         '''
 
@@ -232,19 +248,19 @@ class ResNet38:
              # default learning rate for Adam: 0.001
              # train_op = tf.train.AdamOptimizer().minimize(total_loss)
 
-    def train_wt(self, image, sem_gt, wt_gt, params):
+    def train_wt(self, grad_gt, sem_gt, wt_gt, params):
         '''This function only trains wt branch.
-            Input: Image [batch_size, 512, 1024, 3]
-                    sem_gt [batch_size, 64, 128, 1]
-                    wt_gt [batch_size, 64, 128, 2], tf.float32
+            Input: grad_gt [batch_size, 1024, 2048, 3]
+                    sem_gt [batch_size, 1024, 2048, 1]
+                    wt_gt [batch_size, 256, 512, 2], tf.float32, since downsampled twice
                         * 1st is the discretized watershed transforms
                         * 2nd is the weights for each discretization
                     params: decay_rate, lr, batch_size
         '''
 
         ## Get prediction prepared
-        model = self._build_model(image, sem_gt, is_train=True)
-        pred = model['wt_tail'] #NOTE pred  [batch_size, 16, 64,128] if "NCHW"
+        model = self._build_model(grad_gt, sem_gt, is_train=True)
+        pred = model['wt_tail'] #NOTE pred  [batch_size, 16, 256, 512] if "NCHW"
 
         ### TFBoard summary
         summ_pred = tf.argmax(tf.nn.softmax(tf.transpose(pred, [0, 2, 3, 1])), axis=3)
@@ -253,19 +269,20 @@ class ResNet38:
         pred_sum_op = tf.summary.image('pred_out', summ_pred)
         ###
 
-        pred = tf.reshape(pred, [params['batch_size'], 16, 64*128]) #NOTE: pred [batch_size, 16, 64*128] if "NCHW"
+        pred = tf.reshape(pred, [params['batch_size'], 16, 256*512]) #NOTE: pred [batch_size, 16, 256*512] if "NCHW"
         if self._data_format == 'NCHW':
-            pred = tf.transpose(pred, [0, 2, 1]) #NOTE, pred [batch_size, 64*128, 16]
+            pred = tf.transpose(pred, [0, 2, 1]) #NOTE, pred [batch_size, 256*512, 16]
 
         ## Get GTs prepared
-        sem_gt = tf.reshape(sem_gt, [params['batch_size'],64*128]) #NOTE sem_gt [batch_size, 64*128]
-        wt_label = tf.reshape(wt_gt[:,:,:,0:1], [params['batch_size'], 64*128]) #NOTE wt_label [batch_size, 64*128]
+        sem_gt = tf.image.resize_images(sem_gt, [256,512], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        sem_gt = tf.reshape(sem_gt, [params['batch_size'],256*512]) #NOTE sem_gt [batch_size, 256*512]
+        wt_label = tf.reshape(wt_gt[:,:,:,0:1], [params['batch_size'], 256*512]) #NOTE wt_label [batch_size, 256*512]
         wt_label = tf.cast(wt_label, tf.int32)
-        wt_weight = tf.reshape(wt_gt[:,:,:,1:2], [params['batch_size'], 64*128]) #NOTE wt_weight [batch_size, 64*128]
+        wt_weight = tf.reshape(wt_gt[:,:,:,1:2], [params['batch_size'], 256*512]) #NOTE wt_weight [batch_size, 256*512]
 
 
         ## Get valid pixels to compute
-        bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [batch_size, 64*128]
+        bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [batch_size, 256*512]
         valid_pred = tf.boolean_mask(pred, bool_mask)
         valid_wt_label = tf.boolean_mask(wt_label, bool_mask)
         valid_wt_weight = tf.boolean_mask(wt_weight, bool_mask)

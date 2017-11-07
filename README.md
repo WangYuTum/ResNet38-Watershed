@@ -27,6 +27,7 @@ Thanks for the GPU provided by [Computer Vision and Pattern Recongnition Group a
 
 ## NOTES
 
-- Train all BN parameters of graddir/wt branches, fix moving statistics of shared features.
 - No randomly flip image while training.
+- Modified the network to pretrain only WT-Blocks, input sem-gt as gating, grad-gt, wt-gt, output predicted wt-gt.
+- The next step is to concatenate pretrain grads and wt networks.
 

@@ -10,9 +10,9 @@ import data_utils as dt
 from core import resnet38
 
 # Prepare dataset
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 train_data_params = {'mode': 'train_wt',
-                     'batch_size': 1}
+                     'batch_size': 6}
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
     CityData = dt.CityDataSet(train_data_params)
@@ -20,10 +20,10 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/grad2_adam_batch3/watershed_preimgneta1_grad8s_ep27.npy',
-                'batch_size': 1,
+                # 'feed_weight': '../data/trained_weights/',
+                'batch_size': 6,
                 'decay_rate': 0.0005,
-                'lr': 0.00005,
+                'lr': 0.0005,
                 'data_format': "NCHW", # optimal for cudnn
                 'save_path': '../data/saved_weights/',
                 'tsboard_save_path': '../data/tsboard/'}
@@ -34,11 +34,12 @@ num_train = 2975
 # Build network
 # This part should be on GPU
 res38 = resnet38.ResNet38(model_params)
-[train_op, loss] = res38.train_wt(image=next_batch['img'], sem_gt=next_batch['sem_gt'],
+[train_op, loss] = res38.train_wt(grad_gt=next_batch['grad_gt'], sem_gt=next_batch['sem_gt'],
                                    wt_gt=next_batch['wt_gt'], params=model_params)
 ###
-input_img_sum = tf.summary.image('input_img', next_batch['img'])
-input_img_sum = tf.summary.image('input_sem', tf.cast(next_batch['sem_gt'], tf.float16))
+# input_img_sum = tf.summary.image('input_img', next_batch['img'])
+input_grad_sum = tf.summary.image('input_grad', tf.concat([next_batch['grad_gt'], tf.zeros([model_params['batch_size'],1024,2048,1])], axis=-1))
+input_sem_sum = tf.summary.image('input_sem', tf.cast(next_batch['sem_gt'], tf.float16))
 input_wt_sum = tf.summary.image('input_wt', next_batch['wt_gt'][:,:,:,0:1])
 ###
 
@@ -67,7 +68,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/wt_adam_batch1/watershed_pregradsa1_wt8s_ep%d.npy'%(epoch)
+                save_name = '/wt_adam_batch1/watershed_preimga1_wt8s_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 

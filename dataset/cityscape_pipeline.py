@@ -116,7 +116,7 @@ class CityDataSet():
         # Cast RGB pixels to tf.float32
         data_dict['img'] = tf.cast(out_data['img'], tf.float32)
         data_dict['sem_gt'] = tf.cast(out_data['sem_gt'], tf.int32)
-        # data_dict['grad_gt'] = tf.cast(out_data['grad_gt'], tf.float32)
+        data_dict['grad_gt'] = tf.cast(out_data['grad_gt'], tf.float32)
         data_dict['wt_gt'] = tf.cast(out_data['wt_gt'], tf.int32)
 
         return data_dict
@@ -142,9 +142,9 @@ class CityDataSet():
 
         # Pack the result
         transformed = {}
-        transformed['img'] = rgb_img
+        # transformed['img'] = rgb_img
         transformed['sem_gt'] = example['sem_gt']
-        # transformed['grad_gt'] = example['grad_gt']
+        transformed['grad_gt'] = example['grad_gt']
         transformed['wt_gt'] = example['wt_gt']
 
         return transformed
@@ -225,12 +225,11 @@ class CityDataSet():
 
             Transformation:
                 * Assign each discretized value a weight as in the paper: c_k
-                * Resize image to [512, 1024] fit TitanX 12GB memory
-                * Resize sem_gt/wt_gt by 1/(2*8) for loss calculation, [64,128]
+                * Resize sem_gt/wt_gt by 1/(4) for loss calculation, [256,512]
             After this transformation:
-                * Image has shape: [512,1024,3], tf.float32
-                * sem_gt has shape: [64,128,1], tf.int32
-                * wt_gt has shape: [64,128,2], tf.float32
+                * grad_gt has shape: [1024,2048,2], tf.float32
+                * sem_gt has shape: [1024,2048,1], tf.int32
+                * wt_gt has shape: [256,512,1], tf.float32
                     * The 1st channel is discretized values: [0,15]
                     * The 2nd channel is the weights c_k
         '''
@@ -246,14 +245,13 @@ class CityDataSet():
         wt_gt = tf.concat([wt_gt0, wt_gt], axis=-1)
 
         # Resize
-        image = tf.image.resize_images(example['img'], [512,1024], tf.image.ResizeMethod.BILINEAR)
-        sem_gt = tf.image.resize_images(example['sem_gt'], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        wt_gt = tf.image.resize_images(wt_gt, [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        # sem_gt = tf.image.resize_images(example['sem_gt'], [256,512], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        wt_gt = tf.image.resize_images(wt_gt, [256,512], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
         # Pack the result
         transformed = {}
-        transformed['img'] = image
-        transformed['sem_gt'] = sem_gt
+        transformed['grad_gt'] = example['grad_gt']
+        transformed['sem_gt'] = example['sem_gt']
         transformed['wt_gt'] = wt_gt
 
         return transformed

@@ -323,17 +323,19 @@ def WT_Block(data_format, input_tensor, feed_dict, shape, var_dict=None):
     with tf.variable_scope('side'):
          side_out = conv_layer(data_format, RELU_out1, feed_dict, 1, 'SAME',
                                shape[2], var_dict)
-    # The first dilated conv
+    # The first conv
     with tf.variable_scope('conv1'):
-        CONV_out1 = conv_dilate_layer(data_format, RELU_out1, feed_dict, 12,
-                                      'SAME', shape[0], var_dict)
+        #CONV_out1 = conv_dilate_layer(data_format, RELU_out1, feed_dict, 12,
+        #                              'SAME', shape[0], var_dict)
+        CONV_out1 = conv_layer(data_format, RELU_out1, feed_dict, 1, 'SAME', shape[0], var_dict)
     # The 2nd batchnorm
     BN_out2 = BN(data_format, CONV_out1, feed_dict, 'bn2', is_train, shape[1][2], var_dict)
     RELU_out2 = ReLu_layer(BN_out2)
-    # The 2nd dilated conv
+    # The 2nd conv
     with tf.variable_scope('conv2'):
-        CONV_out2 = conv_dilate_layer(data_format, RELU_out2, feed_dict, 12,
-                                      'SAME', shape[1], var_dict)
+        #CONV_out2 = conv_dilate_layer(data_format, RELU_out2, feed_dict, 12,
+        #                              'SAME', shape[1], var_dict)
+        CONV_out2 = conv_layer(data_format, RELU_out2, feed_dict, 1, 'SAME', shape[1], var_dict)
     # Fuse
     out = tf.add(side_out, CONV_out2)
 
@@ -354,17 +356,19 @@ def WT_tail(data_format, input_tensor, feed_dict, shape, var_dict=None):
                  bn_scope='bn1', is_train=is_train, shape=shape[0][2], var_dict=var_dict)
     RELU_out1 = ReLu_layer(BN_out1)
 
-    # The first dilated conv layer
+    # The first conv layer
     with tf.variable_scope('conv1'):
-        CONV_out1 = conv_dilate_layer(data_format, RELU_out1, feed_dict, 12,
-                                      'SAME', shape[0], var_dict)
+        #CONV_out1 = conv_dilate_layer(data_format, RELU_out1, feed_dict, 12,
+        #                              'SAME', shape[0], var_dict)
+        CONV_out1 = conv_layer(data_format, RELU_out1, feed_dict, 1, 'SAME', shape[0], var_dict)
     with tf.variable_scope('bias1'):
         BIAS_out1 = bias_layer(data_format, CONV_out1, feed_dict, shape[0][3], var_dict)
     RELU_out2 = ReLu_layer(BIAS_out1)
-    # The second dilated conv layer
+    # The second conv layer
     with tf.variable_scope('conv2'):
-        CONV_out2 = conv_dilate_layer(data_format, RELU_out2, feed_dict, 12,
-                                      'SAME', shape[1], var_dict)
+        #CONV_out2 = conv_dilate_layer(data_format, RELU_out2, feed_dict, 12,
+        #                              'SAME', shape[1], var_dict)
+        CONV_out2 = conv_layer(data_format, RELU_out2, feed_dict, 1, 'SAME', shape[1], var_dict)
     with tf.variable_scope('bias2'):
         BIAS_out2 = bias_layer(data_format, CONV_out2, feed_dict, shape[1][3], var_dict)
 
