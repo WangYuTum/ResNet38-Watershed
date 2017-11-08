@@ -38,7 +38,7 @@ class CityDataSet():
         self._train_size = 2975
         self._TFrecord_file = None
         self._dataset = None
-        self._valimg_indices = None
+        self._img_indices = None
         self._batch_idx = 0
 
         self._pred_save_path = params.get('pred_save_path','../data/pred_trainIDs')
@@ -76,10 +76,10 @@ class CityDataSet():
             self._TFrecord_file = '/work/wangyu/cityscape_train.tfrecord'
         elif self._mode == 'val_sem':
             self._TFrecord_file = '/work/wangyu/cityscape_val.tfrecord'
-            self._valimg_indices = self._load_valimg_indicies()
-        # TODO
+            self._img_indices = self._load_img_indicies()
         elif self._mode == 'test_sem':
             self._TFrecord_file = '/work/wangyu/cityscape_test.tfrecord'
+            self._img_indices = self._load_img_indicies()
         else:
             sys.exit('No valid mode!')
         self._dataset = self._build_pipeline()
@@ -91,21 +91,28 @@ class CityDataSet():
             Return: data_dict'''
 
         # TFrecords format for cityscape dataset
-        record_features = {
-            "height": tf.FixedLenFeature([1],tf.int64),
-            "width": tf.FixedLenFeature([1],tf.int64),
-            "img": tf.FixedLenFeature([1024, 2048, 3],tf.int64),
-            "sem_gt": tf.FixedLenFeature([1024, 2048, 1],tf.int64),
-            "grad_gt": tf.FixedLenFeature([1024, 2048, 2],tf.float32),
-            "wt_gt": tf.FixedLenFeature([1024, 2048, 1],tf.int64),
-        }
+        if self._mode == 'train_sem' or self._mode == 'val_sem':
+            record_features = {
+                "height": tf.FixedLenFeature([1],tf.int64),
+                "width": tf.FixedLenFeature([1],tf.int64),
+                "img": tf.FixedLenFeature([1024, 2048, 3],tf.int64),
+                "sem_gt": tf.FixedLenFeature([1024, 2048, 1],tf.int64),
+                "grad_gt": tf.FixedLenFeature([1024, 2048, 2],tf.float32),
+                "wt_gt": tf.FixedLenFeature([1024, 2048, 1],tf.int64),
+            }
+        elif self._mode == 'test_sem':
+            record_features = {
+                "height": tf.FixedLenFeature([1],tf.int64),
+                "width": tf.FixedLenFeature([1],tf.int64),
+                "img": tf.FixedLenFeature([1024, 2048, 3],tf.int64)
+            }
 
         data_dict = {}
         out_data = tf.parse_single_example(serialized=record, features=record_features)
 
         # Cast RGB pixels to tf.float32
         data_dict['img'] = tf.cast(out_data['img'], tf.float32)
-        data_dict['sem_gt'] = tf.cast(out_data['sem_gt'], tf.int32)
+        # data_dict['sem_gt'] = tf.cast(out_data['sem_gt'], tf.int32)
         # data_dict['grad_gt'] = tf.cast(out_data['grad_gt'], tf.float32)
         # data_dict['wt_gt'] = tf.cast(out_data['wt_gt'], tf.int32)
 
@@ -133,7 +140,7 @@ class CityDataSet():
         # Pack the result
         transformed = {}
         transformed['img'] = rgb_img
-        transformed['sem_gt'] = example['sem_gt']
+        # transformed['sem_gt'] = example['sem_gt']
         # transformed['grad_gt'] = example['grad_gt']
         # transformed['wt_gt'] = example['wt_gt']
 
@@ -209,6 +216,22 @@ class CityDataSet():
 
         return dataset
 
+    def _build_semtest_pipeline(self, TFrecord_file):
+        '''
+            Given the .tfrecord path, build a datapipeline using member functions
+            Return: A TF dataset object
+
+            NOTE: The .tfrecord file is compressed using "GZIP"
+        '''
+
+        #NOTE: Only go through .tfrecord once and no shuffle
+        dataset = tf.contrib.data.TFRecordDataset(TFrecord_file, "GZIP")
+        dataset = dataset.map(self._parse_single_record, num_threads=5, output_buffer_size=15)
+        dataset = dataset.map(self._image_standardization, num_threads=5, output_buffer_size=15)
+        dataset = dataset.batch(self._batch_size)
+
+        return dataset
+
     def _build_pipeline(self):
 
         if self._mode == 'train_sem':
@@ -216,6 +239,8 @@ class CityDataSet():
             print('Train_sem pipeline built. Load tfrecord: {}'.format(self._TFrecord_file))
         elif self._mode == 'val_sem':
             dataset = self._build_semval_pipeline(TFrecord_file=self._TFrecord_file)
+        elif self._mode == 'test_sem':
+            dataset = self._build_semtest_pipeline(TFrecord_file=self._TFrecord_file)
         else:
             sys.exit('Mode {} is not supported.'.format(self._mode))
 
@@ -291,8 +316,8 @@ class CityDataSet():
             Note that this function only works during inference.
         '''
         for i in range(self._batch_idx, self._batch_idx+self._batch_size):
-            img_inx = self._valimg_indices[i].split('/')
-            # eg, ../data/CityDatabase/leftImg8bit/val/frankfurt/frankfurt_000000_000294_leftImg8bit.png
+            img_inx = self._img_indices[i].split('/')
+            # eg, ../data/CityDatabase/leftImg8bit/val(test)/frankfurt/frankfurt_000000_000294_leftImg8bit.png
             fname = img_inx[6]
             fname = fname.split('_')
             fname = fname[0]+'_'+fname[1]+'_'+fname[2]+'_trainIds.png'
@@ -340,22 +365,26 @@ class CityDataSet():
             imsave(output_img, image)
             print("LabelIDs prediction saved to %s"%output_img)
 
-    def _load_valimg_indicies(self):
+    def _load_img_indicies(self):
         '''
-            Load val image names for inference.
+            Load image names for inference.
         '''
-        print('Loading val set indices...')
+
+        if self._mode == 'val_sem':
+            mode = 'val'
+        elif self._mode == 'test_sem':
+            mode = 'test'
+        else:
+            sys.exit('Invalid mode for loading indices.')
+        print('Loading {0} set indices...'.format(mode))
         files_img = []
 
-        if self._mode != 'val_sem':
-            sys.exit('Error: Wrong mode during validation.')
-
-        search_img = os.path.join('../data/CityDatabase', 'leftImg8bit', 'val',
+        search_img = os.path.join('../data/CityDatabase', 'leftImg8bit', mode,
                                   '*', '*_leftImg8bit.png')
         files_img = glob.glob(search_img)
         files_img.sort()
 
-        print('Loaded val image indices: {}'.format(len(files_img)))
+        print('Loaded {0} image indices: {1}'.format(mode, len(files_img)))
         return (files_img)
 
 # Only used for test purpose
