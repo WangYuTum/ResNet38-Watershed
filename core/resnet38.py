@@ -133,10 +133,14 @@ class ResNet38:
                                                                  shape_dict['B7'],
                                                                  dropout=dropout,
                                                                  var_dict=var_dict)
+        with tf.variable_scope('semantic'):
+            shape_dict['semantic'] = [[3,3,4096,512],[3,3,512,self._num_classes]]
+            model['semantic'] = nn.ResUnit_tail(self._data_format, model['B7'], feed_dict,
+                                                shape_dict['semantic'], var_dict)
 
         # The graddir unique part: conv1 + conv2 + 3*conv3(kernel: [1x1])
         # Gating operation, need semantic GT while training and inference
-        model['gated_feat'] = self._gate(sem_gt, model['B7'])
+        model['gated_feat'] = self._gate(model['semantic'], model['B7'])
 
         with tf.variable_scope("graddir"):
             # Further feature extractors
@@ -216,6 +220,10 @@ class ResNet38:
         '''
 
         model = self._build_model(image, sem_gt, is_train=True)
+
+        ## Get semantic loss
+        sem_loss = self._get_sem_loss(model, sem_gt, params)
+
         pred = model['grad_norm'] #NOTE pred  [batch_size, 2, 64,128] if "NCHW"
         if self._data_format == 'NCHW':
             pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 64, 128, 2]
@@ -231,7 +239,10 @@ class ResNet38:
         valid_cos_out = tf.cond(tf.equal(tf.reduce_sum(tf.cast(bool_mask, tf.int32)), 0), lambda: 0.0, lambda: tf.boolean_mask(cos_out, bool_mask))
         loss_grad = tf.reduce_mean(tf.square(valid_cos_out))
         loss_grad_valid = tf.cond(tf.is_nan(loss_grad), lambda: 0.0, lambda: loss_grad)
-        loss_total = loss_grad_valid + self._weight_decay(params['decay_rate'])
+        loss_grad_total = loss_grad_valid + self._weight_decay(params['decay_rate'])
+
+        ## Total loss
+        loss_total = sem_loss + loss_grad_total
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
@@ -243,6 +254,28 @@ class ResNet38:
         ###
 
         return train_step, loss_total
+
+    def _get_sem_loss(self, model, sem_gt, params):
+        '''
+            Get the semantic loss.
+            Input: model
+                   sem_gt: [batch_size, 64, 128, 1]
+                   params
+        '''
+            pred = model['semantic'] # shape [batch_size, 19, 64, 128]
+            new_shape = [params['batch_size'], self._num_classes, 64*128]
+            pred = tf.reshape(pred, new_shape) # [batch_size, 19, 64*128]
+            if self._data_format == 'NCHW':
+                pred = tf.transpose(pred, [0, 2, 1]) # [batch_size, 64*128,19]
+            sem_gt = tf.reshape(sem_gt, [params['batch_size'] ,64*128]) # [batch_size, 64*128]
+            void_bool = tf.equal(sem_gt, 19)
+            valid_bool = tf.logical_not(void_bool)
+            valid_label = tf.boolean_mask(sem_gt, valid_bool)
+            valid_pred = tf.boolean_mask(pred, valid_bool)
+
+            loss_sem = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_label, logits=valid_pred))
+
+            return loss_sem
 
     def inf(self, image, sem_gt):
         ''' Input: Image [batch_size, 1024, 2048, 3]

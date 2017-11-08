@@ -11,7 +11,7 @@ from core import resnet38
 
 # Prepare dataset
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-train_data_params = {'mode': 'train_grad',
+train_data_params = {'mode': 'train_semgrad',
                      'batch_size': 3}
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
@@ -20,7 +20,7 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/grad2_adam_batch3/watershed_preimgneta1_grad8s_ep18.npy',
+                'feed_weight': '../data/saved_weights/.......',
                 'batch_size': 3,
                 'decay_rate': 0.0005,
                 'lr': 0.00001,
@@ -50,7 +50,7 @@ init = tf.global_variables_initializer()
 with tf.Session() as sess:
     save_path = model_params['save_path']
     batch_size = model_params['batch_size']
-    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'grad2/adam_batch3/', sess.graph)
+    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'semgrad/adam_batch3/', sess.graph)
 
     sess.run(init)
     num_iters = np.int32(num_train / batch_size) + 1
@@ -67,7 +67,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/grad2_adam_batch3/watershed_preimgneta1_grad8s_ep%d.npy'%(epoch+18)
+                save_name = '/semgrad_adam_batch3/watershed_presema1_grad8s_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 
