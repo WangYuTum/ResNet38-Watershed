@@ -250,7 +250,9 @@ class ResNet38:
 
     def train_wt(self, grad_gt, sem_gt, wt_gt, params):
         '''This function only trains wt branch.
-            Input: grad_gt [batch_size, 1024, 2048, 3]
+            Input:  grad_gt [batch_size, 1024, 2048, 3]
+                        * [batch_size, 1024, 2048, 0:2] is the grad_gt
+                        * [batch_size, 1024, 2048, 2:3] is the inverse of sqrt(area)
                     sem_gt [batch_size, 1024, 2048, 1]
                     wt_gt [batch_size, 256, 512, 2], tf.float32, since downsampled twice
                         * 1st is the discretized watershed transforms
@@ -259,7 +261,7 @@ class ResNet38:
         '''
 
         ## Get prediction prepared
-        model = self._build_model(grad_gt, sem_gt, is_train=True)
+        model = self._build_model(grad_gt[:,:,:,0:2], sem_gt, is_train=True)
         pred = model['wt_tail'] #NOTE pred  [batch_size, 16, 256, 512] if "NCHW"
 
         ### TFBoard summary
@@ -279,6 +281,8 @@ class ResNet38:
         wt_label = tf.reshape(wt_gt[:,:,:,0:1], [params['batch_size'], 256*512]) #NOTE wt_label [batch_size, 256*512]
         wt_label = tf.cast(wt_label, tf.int32)
         wt_weight = tf.reshape(wt_gt[:,:,:,1:2], [params['batch_size'], 256*512]) #NOTE wt_weight [batch_size, 256*512]
+        grad_weight = tf.image.resize_images(grad_gt[:,:,:,2:3], [256,512], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        grad_weight = tf.reshape(grad_weight, [params['batch_size'], 256*512])
 
 
         ## Get valid pixels to compute
@@ -286,13 +290,14 @@ class ResNet38:
         valid_pred = tf.boolean_mask(pred, bool_mask)
         valid_wt_label = tf.boolean_mask(wt_label, bool_mask)
         valid_wt_weight = tf.boolean_mask(wt_weight, bool_mask)
+        valid_grad_weight = tf.boolean_mask(grad_weight, bool_mask)
 
 
         ## Compute weighted loss
         # if no label is 13, set loss to 0.0
         weighted_cross = tf.cond(tf.equal(tf.reduce_sum(tf.cast(bool_mask, tf.int32)), 0),
                                  lambda: 0.0,
-                                 lambda: self._weight_cross_loss(valid_pred, valid_wt_label,valid_wt_weight))
+                                 lambda: self._weight_cross_loss(valid_pred, valid_wt_label,valid_wt_weight, valid_grad_weight))
         loss_total = weighted_cross + self._weight_decay(params['decay_rate'])
 
         ## Minimize
@@ -302,13 +307,13 @@ class ResNet38:
 
         return train_step, loss_total
 
-    def _weight_cross_loss(self, valid_pred, valid_wt_label, valid_wt_weight):
+    def _weight_cross_loss(self, valid_pred, valid_wt_label, valid_wt_weight, valid_grad_weight):
 
         cross_out = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_wt_label, logits=valid_pred) #NOTE same shape as valid_wt_label/valid_wt_weight
-        # weighted_cross = tf.reduce_mean(tf.multiply(cross_out, valid_wt_weight))
-        weighted_cross = tf.reduce_mean(cross_out)
+        weighted_cross = tf.reduce_mean(tf.multiply(tf.multiply(cross_out, valid_wt_weight), valid_grad_weight)) * 100.0
+        weighted_loss = tf.reduce_mean(weighted_cross)
 
-        return weighted_cross
+        return weighted_loss
 
     def train_grad(self, image, sem_gt, grad_gt, params):
         ''' This function only trains graddir branch.

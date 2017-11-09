@@ -87,9 +87,9 @@ class CityDataSet():
         elif self._mode == 'val_grad':
             self._TFrecord_file = '/work/wangyu/cityscape_val.tfrecord'
         elif self._mode == 'train_wt':
-            self._TFrecord_file = '/work/wangyu/cityscape_train.tfrecord'
+            self._TFrecord_file = '/work/wangyu/cityscape_train2.tfrecord'
         elif self._mode == 'val_wt':
-            self._TFrecord_file = '/work/wangyu/cityscape_val.tfrecord'
+            self._TFrecord_file = '/work/wangyu/cityscape_val2.tfrecord'
         else:
             sys.exit('No valid mode!')
         self._dataset = self._build_pipeline()
@@ -106,7 +106,7 @@ class CityDataSet():
             "width": tf.FixedLenFeature([1],tf.int64),
             "img": tf.FixedLenFeature([1024, 2048, 3],tf.int64),
             "sem_gt": tf.FixedLenFeature([1024, 2048, 1],tf.int64),
-            "grad_gt": tf.FixedLenFeature([1024, 2048, 2],tf.float32),
+            "grad_gt": tf.FixedLenFeature([1024, 2048, 3],tf.float32),
             "wt_gt": tf.FixedLenFeature([1024, 2048, 1],tf.int64),
         }
 
@@ -227,7 +227,9 @@ class CityDataSet():
                 * Assign each discretized value a weight as in the paper: c_k
                 * Resize sem_gt/wt_gt by 1/(4) for loss calculation, [256,512]
             After this transformation:
-                * grad_gt has shape: [1024,2048,2], tf.float32
+                * grad_gt has shape: [1024,2048,3], tf.float32
+                    * [1024,2048,0:2] is the grad
+                    * [1024,2048,2:3] is the inverse of square root of instance's area
                 * sem_gt has shape: [1024,2048,1], tf.int32
                 * wt_gt has shape: [256,512,1], tf.float32
                     * The 1st channel is discretized values: [0,15]
@@ -334,9 +336,9 @@ class CityDataSet():
         '''
         dataset = tf.contrib.data.TFRecordDataset(TFrecord_file, "GZIP")
         dataset = dataset.repeat()
-        dataset = dataset.map(self._parse_single_record, num_threads=2, output_buffer_size=8)
-        dataset = dataset.map(self._image_standardization, num_threads=2, output_buffer_size=8)
-        dataset = dataset.map(self._wt_train_transform, num_threads=2, output_buffer_size=8)
+        dataset = dataset.map(self._parse_single_record, num_threads=6, output_buffer_size=12)
+        dataset = dataset.map(self._image_standardization, num_threads=6, output_buffer_size=12)
+        dataset = dataset.map(self._wt_train_transform, num_threads=6, output_buffer_size=12)
         dataset = dataset.shuffle(buffer_size=1500)
         dataset = dataset.batch(self._batch_size)
 

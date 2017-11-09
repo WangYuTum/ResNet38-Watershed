@@ -38,7 +38,7 @@ res38 = resnet38.ResNet38(model_params)
                                    wt_gt=next_batch['wt_gt'], params=model_params)
 ###
 # input_img_sum = tf.summary.image('input_img', next_batch['img'])
-input_grad_sum = tf.summary.image('input_grad', tf.concat([next_batch['grad_gt'], tf.zeros([model_params['batch_size'],1024,2048,1])], axis=-1))
+input_grad_sum = tf.summary.image('input_grad', tf.concat([next_batch['grad_gt'][:,:,:,0:2], tf.zeros([model_params['batch_size'],1024,2048,1])], axis=-1))
 input_sem_sum = tf.summary.image('input_sem', tf.cast(next_batch['sem_gt'], tf.float16))
 input_wt_sum = tf.summary.image('input_wt', next_batch['wt_gt'][:,:,:,0:1])
 ###
@@ -51,7 +51,7 @@ init = tf.global_variables_initializer()
 with tf.Session() as sess:
     save_path = model_params['save_path']
     batch_size = model_params['batch_size']
-    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'wt/adam_batch1/', sess.graph)
+    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'wt/adam_batch6_weighted/', sess.graph)
 
     sess.run(init)
     num_iters = np.int32(num_train / batch_size) + 1
@@ -68,7 +68,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/wt_adam_batch1/watershed_preimga1_wt8s_ep%d.npy'%(epoch)
+                save_name = '/wt_adam_batch6_weighted/watershed_preimga1_wt8s_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 
