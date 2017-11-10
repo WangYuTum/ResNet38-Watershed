@@ -2,11 +2,11 @@
     Give the following parameters:
         - CITYSCAPES_DATASET: './data/CityDatabase'(default)
     Output:
-        - the corresponding ground truth gradient direction of distance transform for each '*_gt*_instanceIds.png' gt file
+        - the corresponding ground truth discretized (K=[0,15]) distance transform for each '*_gt*_instanceIds.png' gt file
         - example:
             input file:  aachen_000000_000019_gtFine_instanceIds.png
-            output file(as sparse matrix): aachen_000000_000019_gtFine_graddir.npz
-        - this includes all object classes that have instance labelsi
+            output file(as sparse matrix): aachen_000000_000019_gtFine_wt.png
+        - this includes all object classes that have instance labels
         - instanceIds:
             person: 24000 - 24999
             rider: 25000 - 25999
@@ -28,14 +28,13 @@ import sys
 import os
 import glob
 from scipy.misc import imsave
-from scipy.ndimage import distance_transform_edt
-from scipy.sparse import save_npz
-from scipy.sparse import csc_matrix
+from scipy.misc import toimage
+from scipy.ndimage.morphology import distance_transform_cdt
 import multiprocessing
 
 os.environ["CITYSCAPES_DATASET"] = "../data/CityDatabase"
+# os.environ["CITYSCAPES_DATASET"] = "."
 os.environ["NUM_PROCESSES"] = "25"
-# os.environ["CITYSCAPES_DATASET"] = "/Users/WY/Desktop/TUM_profile/MyGit/ResNet38-Watershed/dataset"
 
 def get_file_list(cityscapes_path):
     ''' Get all .png files of intance'''
@@ -53,6 +52,7 @@ def get_file_list(cityscapes_path):
     if not files_fine:
         sys.exit('Did not find any files!')
     print('Got {} train_instance files, {} val_instance files.'.format(len(files_fine_train), len(files_fine_val)))
+    # print('Got {} train_instance files.'.format(len(files_fine_train)))
     return files_fine
 
 def open_gt_file(fname):
@@ -63,10 +63,9 @@ def open_gt_file(fname):
 
     return image
 
-def create_graddir_per_image(image):
-    ''' Given an numpy ndarray image, returns a colored grad image:
-        The 1st channel is the x gradient, the 2nd channel is the y gradient,
-        the 3rd channle if filled with zeros. The gradient vectors of each pixel are normalized to have a unit length'''
+def create_wt_per_image(image):
+    ''' Given an numpy ndarray image, returns discretized distance transform:
+        All pixel values have range of [0,15], integers'''
         # compute number of different instances: person,rider,car,truck,bus,train,motorcycle,bicycle
     ins_num = []
     instances = [24000,25000,26000,27000,28000,31000,32000,33000]
@@ -74,24 +73,30 @@ def create_graddir_per_image(image):
         for i in range(ins_class,ins_class+999):
             if i in image:
                 ins_num.append(i)
-    # for each instance, generate a graddir
-    grad_colors = np.zeros((1024,2048,2))
-    for i in ins_num:
-        bool_mask = np.equal(image, i)
-        dist_trans = distance_transform_edt(bool_mask)
-        [x_grad, y_grad] = np.gradient(dist_trans)
-        # normalize the gradients
-        norm_matrix = np.sqrt(x_grad*x_grad+y_grad*y_grad)
-        zero_mask = np.equal(norm_matrix,0)
-        np.place(norm_matrix,zero_mask,1)
-        x_grad_normed = x_grad / norm_matrix
-        y_grad_normed = y_grad / norm_matrix
-        # norm done
-        grad_color = np.stack((x_grad_normed,y_grad_normed), axis=-1)
-        grad_colors += grad_color
+    # for each instance, generate a watershed_transform
+    dist_trans_img = np.zeros((1024,2048),np.int32)
+    for ins in ins_num:
+        bool_mask = np.equal(image, ins)
+        dist_trans = distance_transform_cdt(bool_mask)
 
-    # grad_colors.astype(np.float16)
-    return grad_colors
+        # discretize
+        fk_start = 0
+        for k in range(16):
+            start = fk_start+k+1
+            end = start+k+1
+            np.place(dist_trans, np.logical_and(dist_trans>=start, dist_trans<=end), k)
+            fk_start = start
+        np.place(dist_trans, dist_trans>=136, 15)
+
+        # stack together
+        dist_trans_img += dist_trans
+
+    # to color
+    # wt_color = np.stack((dist_trans_img,dist_trans_img,dist_trans_img), axis=-1)
+    # wt_color += np.ones((1024,2048,3), np.int32)*128
+
+    # return (dist_trans_img, wt_color)
+    return dist_trans_img
 
 def main():
     if 'CITYSCAPES_DATASET' in os.environ:
@@ -110,35 +115,26 @@ def main():
 
     for i in range(num_processes):
         if i != num_processes-1:
-            process_pool.append(multiprocessing.Process(target=generate_grad, args=(files[i*chunk_size: (i+1)*chunk_size],)))
+            process_pool.append(multiprocessing.Process(target=generate_wt, args=(files[i*chunk_size: (i+1)*chunk_size],)))
         else:
-            process_pool.append(multiprocessing.Process(target=generate_grad, args=(files[i*chunk_size:],)))
+            process_pool.append(multiprocessing.Process(target=generate_wt, args=(files[i*chunk_size:],)))
     for i in range(num_processes):
         process_pool[i].start()
     for i in range(num_processes):
         process_pool[i].join()
 
-    print("Generate graddir done!")
+    print("Generate wt done!")
 
-def generate_grad(files):
+def generate_wt(files):
 
     for fname in files:
         image = open_gt_file(fname)
-        graddir = create_graddir_per_image(image)
-        fname = fname.replace('instanceIds', 'graddir')
-        fname = fname.replace('.png','.npz')
-        print('Save gt graddir to {}.'.format(fname))
-        graddir = np.reshape(graddir, (1024,2048*2))
-        graddir_sparse = csc_matrix(graddir)
-        save_npz(fname, graddir_sparse)
+        wt = create_wt_per_image(image)
+        fname = fname.replace('instanceIds', 'wt')
+        print('Save gt wt to {}.'.format(fname))
+        toimage(wt, high=15, low=0, cmin=0, cmax=15, pal=None,mode=None).save(fname)
 
 if __name__ == "__main__":
     main()
-
-
-
-
-
-
 
 
