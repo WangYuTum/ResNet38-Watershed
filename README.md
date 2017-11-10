@@ -1,24 +1,22 @@
 # ResNet38-Watershed
 ResNet38 to perform discretized watershed transform branch of watershed unified network.
-
+Note that this is a rather small network.
 
 ## Implementation
 
 Implement based on Model A1, 2convs in paper [Wider or Deeper: Revisiting the ResNet Model for Visual Recognition](https://arxiv.org/abs/1611.10080).
-Downsampling 3 times with convolution stride=2 before B2, B3 and B4.
-Use dilated convolution in B5(rate=2), B6(rate=4), B7(rate=4) and wt-convs
-Use dropout: dropout rate=0.3 for 2048 channels, dropout rate=0.5 for 4096 channels.
+Downsampling 2 times with convolution stride=2 at B2, B3. No dilated convs.
 
-Model A structure: Input -> B0 -> B2(stride=2, x3) -> B3(stride=2, x3) -> B4(stride=2, x6) -> B5(rate=2, x3) -> B6(rate=4, x1) -> B7(rate=4, x1) -> Gating -> Grad-convs(grad-convs1, grad-convs2, no dilation) -> WT-B0([3,3,2,64]) -> WT-B2([3,3,64,128], [3,3,128,128], dilate=12) -> WT-B3([3,3,128,256], [3,3,256,256], dilate=12) -> WT-B4([3,3,256,512], [3,3,512,512], dilated=12) -> WT-tail([3,3,512,512], [3,3,512,16], dilated=12) -> Softmax
-
+Model structure: Input(grad-gt, sem-gt, full size) - > Gate -> B0[3,3,2,8] -> B2[[3,3,8,16],[3,3,16,16], downsample] -> B3[[3,3,16,32],[3,3,32,32], downsample]
+-> B4[[3,3,32,64],[3,3,64,64]] -> Tail[[3,3,64,64],[3,3,64,16]] -> Softmax
 ## Results
 
 - Unified watershed wt branch which implements discretized watershed transform.
-- Pretrained: init from watershed-grads-27 epoches
-- Performance: Not good
+- Init: Randomly init
+- Performance: Visually good
 - Data set: 2975 training image(1024x2048). 500 val images(not used for training). 1525 test images(without GT) 
-- Data augmentation: Per image standardization (adapted from MXnet implementation). Randomly shuffle. Per image resize to [512,1024]
-- Training: Train 18 epochs. Batch 1. Adam optimizer(rate=5e-5). L2 weight decay 0.0005.
+- Data augmentation: Per image standardization (adapted from MXnet implementation). Randomly shuffle.
+- Training: Train 18 epochs. Batch 6. Adam optimizer(rate=0.0005). L2 weight decay 0.0005.
 - Device: TitanX(Pascal) 12GB
 
 ## Acknowledge
@@ -26,8 +24,3 @@ Model A structure: Input -> B0 -> B2(stride=2, x3) -> B3(stride=2, x3) -> B4(str
 Thanks for the GPU provided by [Computer Vision and Pattern Recongnition Group at Technical University Munich](https://vision.in.tum.de/)
 
 ## NOTES
-
-- No randomly flip image while training.
-- Modified the network to pretrain only WT-Blocks, input sem-gt as gating, grad-gt, wt-gt, output predicted wt-gt.
-- The next step is to concatenate pretrain grads and wt networks.
-

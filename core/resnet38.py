@@ -347,18 +347,18 @@ class ResNet38:
 
         return train_step, loss_total
 
-    def inf(self, image, sem_gt):
-        ''' Input: Image [batch_size, 1024, 2048, 3]
+    def inf(self, grad_gt, sem_gt):
+        ''' Input: grad_gt [batch_size, 1024, 2048, 3]
+                        * [batch_size, 1024, 2048, 0:2] is the grad gt
+                        * [batch_size, 1024, 2048, 2:3] is the inverse of sqrt(area)
                    sem_gt [batch_size, 1024, 2048, 1]
             Output: upsampled wt result [batch_size, 1024, 2048, 16]
         '''
-        small_size = [128, 256]
-        sem_gt0 = tf.image.resize_images(sem_gt, small_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
-        model = self._build_model(image, sem_gt0, is_train=False)
+        model = self._build_model(grad_gt[:,:,:,0:2], sem_gt, is_train=False)
 
-        pred = model['wt_convs1'] #NOTE, pred is [batch_size, 16, 128, 256] if "NCHW"
+        pred = model['wt_tail'] #NOTE pred  [batch_size, 16, 256, 512] if "NCHW"
         if self._data_format == 'NCHW':
-            pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 128, 256, 16]
+            pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 256, 512, 16]
         pred = self._upsample(pred, [1024,2048]) # [batch_size, 1024, 2048, 16]
         pred_label = tf.argmax(tf.nn.softmax(pred), axis=3)
         pred_label = tf.expand_dims(pred_label, axis=-1)
