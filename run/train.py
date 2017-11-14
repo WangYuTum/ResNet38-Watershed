@@ -11,7 +11,7 @@ from core import resnet38
 
 # Prepare dataset
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-train_data_params = {'mode': 'train_semgrad',
+train_data_params = {'mode': 'train_grad', # NOTE, later change to train_semgrad
                      'batch_size': 3}
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
@@ -20,14 +20,14 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/.......',
+                'feed_weight': '../data/saved_weights/sem2_momen_batch4/watershed_prestage1a1_8s_ep65.npy',
                 'batch_size': 3,
-                'decay_rate': 0.0005,
+                'decay_rate': 0.00001,
                 'lr': 0.00001,
                 'data_format': "NCHW", # optimal for cudnn
                 'save_path': '../data/saved_weights/',
                 'tsboard_save_path': '../data/tsboard/'}
-train_ep = 10
+train_ep = 19
 save_ep = 3
 num_train = 2975
 
@@ -39,7 +39,7 @@ res38 = resnet38.ResNet38(model_params)
 ###
 input_img_sum = tf.summary.image('input_img', next_batch['img'])
 input_sem_sum = tf.summary.image('input_sem', tf.cast(next_batch['sem_gt'], tf.float16))
-input_grad_sum = tf.summary.image('input_grad', tf.concat([next_batch['grad_gt'], tf.zeros([model_params['batch_size'],64,128,1])], axis=-1))
+input_grad_sum = tf.summary.image('input_grad', tf.concat([next_batch['grad_gt'][:,:,:,0:2], tf.zeros([model_params['batch_size'],64,128,1])], axis=-1))
 ###
 
 save_dict_op = res38._var_dict

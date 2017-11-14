@@ -99,52 +99,52 @@ class ResNet38:
                                                                    feed_dict,
                                                                    shape_dict['B4']['convs'][1],
                                                                    var_dict=var_dict)
-            # B5_1: [H/8, W/8, 512] -> [H/8, W/8, 1024]
-            shape_dict['B5_1'] = {}
-            shape_dict['B5_1']['side'] = [1,1,512,1024]
-            shape_dict['B5_1']['convs'] = [[3,3,512,512],[3,3,512,1024]]
-            with tf.variable_scope('B5_1'):
-                model['B5_1'] = nn.ResUnit_hybrid_dilate_2conv(self._data_format, model['B4_6'],
-                                                                   feed_dict,
-                                                                   shape_dict['B5_1'],
-                                                                   var_dict=var_dict)
-            # B5_2, B5_3: [H/8, W/8, 1024]
-            # Shape for B5_2, B5_3
-            shape_dict['B5_2_3'] = [[3,3,1024,512],[3,3,512,1024]]
-            for i in range(2):
-                with tf.variable_scope('B5_'+str(i+2)):
-                    model['B5_'+str(i+2)] = nn.ResUnit_full_dilate_2convs(self._data_format, model['B5_'+str(i+1)],
-                                                      feed_dict, shape_dict['B5_2_3'],
-                                                      var_dict=var_dict)
+           # # B5_1: [H/8, W/8, 512] -> [H/8, W/8, 1024]
+           # shape_dict['B5_1'] = {}
+           # shape_dict['B5_1']['side'] = [1,1,512,1024]
+           # shape_dict['B5_1']['convs'] = [[3,3,512,512],[3,3,512,1024]]
+           # with tf.variable_scope('B5_1'):
+           #     model['B5_1'] = nn.ResUnit_hybrid_dilate_2conv(self._data_format, model['B4_6'],
+           #                                                        feed_dict,
+           #                                                        shape_dict['B5_1'],
+           #                                                        var_dict=var_dict)
+           # # B5_2, B5_3: [H/8, W/8, 1024]
+           # # Shape for B5_2, B5_3
+           # shape_dict['B5_2_3'] = [[3,3,1024,512],[3,3,512,1024]]
+           # for i in range(2):
+           #     with tf.variable_scope('B5_'+str(i+2)):
+           #         model['B5_'+str(i+2)] = nn.ResUnit_full_dilate_2convs(self._data_format, model['B5_'+str(i+1)],
+           #                                           feed_dict, shape_dict['B5_2_3'],
+           #                                           var_dict=var_dict)
 
-            # B6: [H/8, W/8, 1024] -> [H/8, W/8, 2048]
-            shape_dict['B6'] = [[1,1,1024,512],[3,3,512,1024],[1,1,1024,2048]]
-            with tf.variable_scope('B6'):
-                model['B6'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B5_3'],
-                                                                 feed_dict,
-                                                                 shape_dict['B6'],
-                                                                 dropout=dropout,
-                                                                 var_dict=var_dict)
-            # B7: [H/8, W/8, 2048] -> [H/8, W/8, 4096]
-            shape_dict['B7'] = [[1,1,2048,1024],[3,3,1024,2048],[1,1,2048,4096]]
-            with tf.variable_scope('B7'):
-                model['B7'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B6'],
-                                                                 feed_dict,
-                                                                 shape_dict['B7'],
-                                                                 dropout=dropout,
-                                                                 var_dict=var_dict)
-        with tf.variable_scope('semantic'):
-            shape_dict['semantic'] = [[3,3,4096,512],[3,3,512,self._num_classes]]
-            model['semantic'] = nn.ResUnit_tail(self._data_format, model['B7'], feed_dict,
-                                                shape_dict['semantic'], var_dict)
+           # # B6: [H/8, W/8, 1024] -> [H/8, W/8, 2048]
+           # shape_dict['B6'] = [[1,1,1024,512],[3,3,512,1024],[1,1,1024,2048]]
+           # with tf.variable_scope('B6'):
+           #     model['B6'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B5_3'],
+           #                                                      feed_dict,
+           #                                                      shape_dict['B6'],
+           #                                                      dropout=dropout,
+           #                                                      var_dict=var_dict)
+           # # B7: [H/8, W/8, 2048] -> [H/8, W/8, 4096]
+           # shape_dict['B7'] = [[1,1,2048,1024],[3,3,1024,2048],[1,1,2048,4096]]
+           # with tf.variable_scope('B7'):
+           #     model['B7'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B6'],
+           #                                                      feed_dict,
+           #                                                      shape_dict['B7'],
+           #                                                      dropout=dropout,
+           #                                                      var_dict=var_dict)
+       # with tf.variable_scope('semantic'):
+       #     shape_dict['semantic'] = [[3,3,4096,512],[3,3,512,self._num_classes]]
+       #     model['semantic'] = nn.ResUnit_tail(self._data_format, model['B7'], feed_dict,
+       #                                         shape_dict['semantic'], var_dict)
 
         # The graddir unique part: conv1 + conv2 + 3*conv3(kernel: [1x1])
         # Gating operation, need semantic GT while training and inference
-        model['gated_feat'] = self._gate(model['semantic'], model['B7'])
+        model['gated_feat'] = self._gate(sem_gt, model['B4_6'])
 
         with tf.variable_scope("graddir"):
             # Further feature extractors
-            shape_dict['grad_convs1'] = [[3,3,4096,512],[3,3,512,512]]
+            shape_dict['grad_convs1'] = [[3,3,512,512],[3,3,512,512]]
             with tf.variable_scope('convs1'):
                 model['grad_convs1'] = nn.grad_convs(self._data_format, model['gated_feat'], feed_dict,
                                                      shape_dict['grad_convs1'], var_dict)
@@ -215,34 +215,38 @@ class ResNet38:
         ''' This function only trains graddir branch.
             Input: Image [batch_size, 512, 1024, 3]
                    sem_gt [batch_size, 64, 128, 1]
-                   grad_gt [batch_size, 64, 128, 2]
+                   grad_gt [batch_size, 64, 128, 3]
+                        * [batch_size, 64, 128, 0:2] is the grad_gt
+                        * [batch_size, 64, 128, 2:3] is the inverse of sqrt(area)
                    params: decay_rate, lr
         '''
 
         model = self._build_model(image, sem_gt, is_train=True)
 
-        ## Get semantic loss
-        sem_loss = self._get_sem_loss(model, sem_gt, params)
+        ## NOTE Get semantic loss
+        #sem_loss = self._get_sem_loss(model, sem_gt, params)
 
         pred = model['grad_norm'] #NOTE pred  [batch_size, 2, 64,128] if "NCHW"
         if self._data_format == 'NCHW':
             pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 64, 128, 2]
 
         # The predicted graddir and GT are already normalized
-        product = tf.reduce_sum(tf.multiply(pred,grad_gt), axis=3) #NOTE product [batch_size, 64,128]
+        product = tf.reduce_sum(tf.multiply(pred,grad_gt[:,:,:,0:2]), axis=3) #NOTE product [batch_size, 64,128]
         product = tf.maximum(product, -0.99)
         product = tf.minimum(product, 0.99)
         cos_out = tf.acos(product)
         sem_gt = tf.reshape(sem_gt, [params['batch_size'],64,128]) #NOTE sem_gt [batch_size,64,128]
         bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [batch_size,64,128]
+        valid_weight = tf.boolean_mask(grad_gt[:,:,:,2:3], bool_mask)
         # if no label is 13, set loss to 0.0
         valid_cos_out = tf.cond(tf.equal(tf.reduce_sum(tf.cast(bool_mask, tf.int32)), 0), lambda: 0.0, lambda: tf.boolean_mask(cos_out, bool_mask))
-        loss_grad = tf.reduce_mean(tf.square(valid_cos_out))
+        loss_grad = tf.reduce_mean(tf.square(valid_cos_out) * valid_weight * 100.0)
         loss_grad_valid = tf.cond(tf.is_nan(loss_grad), lambda: 0.0, lambda: loss_grad)
         loss_grad_total = loss_grad_valid + self._weight_decay(params['decay_rate'])
 
-        ## Total loss
-        loss_total = sem_loss + loss_grad_total
+        ## NOTE Total loss
+        # loss_total = sem_loss + loss_grad_total
+        loss_total = loss_grad_total
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
@@ -262,20 +266,20 @@ class ResNet38:
                    sem_gt: [batch_size, 64, 128, 1]
                    params
         '''
-            pred = model['semantic'] # shape [batch_size, 19, 64, 128]
-            new_shape = [params['batch_size'], self._num_classes, 64*128]
-            pred = tf.reshape(pred, new_shape) # [batch_size, 19, 64*128]
-            if self._data_format == 'NCHW':
-                pred = tf.transpose(pred, [0, 2, 1]) # [batch_size, 64*128,19]
-            sem_gt = tf.reshape(sem_gt, [params['batch_size'] ,64*128]) # [batch_size, 64*128]
-            void_bool = tf.equal(sem_gt, 19)
-            valid_bool = tf.logical_not(void_bool)
-            valid_label = tf.boolean_mask(sem_gt, valid_bool)
-            valid_pred = tf.boolean_mask(pred, valid_bool)
+        pred = model['semantic'] # shape [batch_size, 19, 64, 128]
+        new_shape = [params['batch_size'], self._num_classes, 64*128]
+        pred = tf.reshape(pred, new_shape) # [batch_size, 19, 64*128]
+        if self._data_format == 'NCHW':
+            pred = tf.transpose(pred, [0, 2, 1]) # [batch_size, 64*128,19]
+        sem_gt = tf.reshape(sem_gt, [params['batch_size'] ,64*128]) # [batch_size, 64*128]
+        void_bool = tf.equal(sem_gt, 19)
+        valid_bool = tf.logical_not(void_bool)
+        valid_label = tf.boolean_mask(sem_gt, valid_bool)
+        valid_pred = tf.boolean_mask(pred, valid_bool)
 
-            loss_sem = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_label, logits=valid_pred))
+        loss_sem = tf.reduce_mean(tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_label, logits=valid_pred))
 
-            return loss_sem
+        return loss_sem
 
     def inf(self, image, sem_gt):
         ''' Input: Image [batch_size, 1024, 2048, 3]

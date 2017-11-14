@@ -11,10 +11,10 @@ import data_utils as dt
 from core import resnet38
 from eval import evalPixelSemantic
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 config_gpu = tf.ConfigProto()
 config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.9
-test_data_params = {'mode': 'val_grad',
+test_data_params = {'mode': 'val_grad', #NOTE: later change to val_semgrad
                      'batch_size': 2}
 
 # The data pipeline should be on CPU
@@ -24,7 +24,7 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/grad2_adam_batch3/watershed_preimgneta1_grad8s_ep9.npy',
+                'feed_weight': '../data/saved_weights/semgrad_adam_batch3/watershed_presema1_grad8s_ep18.npy',
                 'batch_size': 2,
                 'data_format': "NCHW", # optimal for cudnn
                 }

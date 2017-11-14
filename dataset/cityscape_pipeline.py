@@ -82,9 +82,9 @@ class CityDataSet():
             self._TFrecord_file = '/work/wangyu/cityscape_test.tfrecord'
             self._img_indices = self._load_img_indicies()
         elif self._mode == 'train_grad':
-            self._TFrecord_file = '/work/wangyu/cityscape_train.tfrecord'
+            self._TFrecord_file = '/work/wangyu/cityscape_train2.tfrecord'
         elif self._mode == 'val_grad':
-            self._TFrecord_file = '/work/wangyu/cityscape_val.tfrecord'
+            self._TFrecord_file = '/work/wangyu/cityscape_val2.tfrecord'
         else:
             sys.exit('No valid mode!')
         self._dataset = self._build_pipeline()
@@ -110,7 +110,7 @@ class CityDataSet():
                 "width": tf.FixedLenFeature([1],tf.int64),
                 "img": tf.FixedLenFeature([1024, 2048, 3],tf.int64),
                 "sem_gt": tf.FixedLenFeature([1024, 2048, 1],tf.int64),
-                "grad_gt": tf.FixedLenFeature([1024, 2048, 2],tf.float32),
+                "grad_gt": tf.FixedLenFeature([1024, 2048, 3],tf.float32),
                 "wt_gt": tf.FixedLenFeature([1024, 2048, 1],tf.int64)
             }
 
@@ -209,7 +209,7 @@ class CityDataSet():
             After this transformation:
                 * Image has shape: [512,1024,3], tf.float32
                 * sem_gt has shape: [64,128,1], tf.int32
-                * grad_gt has shape: [64,128,2], tf.float32
+                * grad_gt has shape: [64,128,3], tf.float32
         '''
         ##NOTE: MUST no random flip.
         # Resize
@@ -454,7 +454,7 @@ class CityDataSet():
         '''
         if self._mode.find('test') != -1:
             mode = 'test'
-        elif self._mode.find('val') != -1
+        elif self._mode.find('val') != -1:
             mode = 'val'
         else:
             sys.exit('Invalid mode for loading indices.')
