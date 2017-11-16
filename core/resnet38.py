@@ -140,7 +140,7 @@ class ResNet38:
 
         # The graddir unique part: conv1 + conv2 + 3*conv3(kernel: [1x1])
         # Gating operation, need semantic GT while training and inference
-        model['gated_feat'] = self._gate(sem_gt, model['B4_6'])
+        model['gated_feat'] = self._gate(sem_gt, model['B4_6']) #NOTE: sem_gt [64,128]
 
         with tf.variable_scope("graddir"):
             # Further feature extractors
@@ -154,7 +154,51 @@ class ResNet38:
                 model['grad_convs2'] = nn.grad_norm(self._data_format, model['grad_convs1'], feed_dict,
                                                     shape_dict['grad_convs2'], var_dict)
             # Normalize the output to have unit vectors
-            model['grad_norm'] = nn.norm(self._data_format, model['grad_convs2'])
+            model['grad_norm'] = nn.norm(self._data_format, model['grad_convs2']) # out shape: [batch_size, 2, 64, 128]
+
+        # upsample to full size
+        if self._data_format == "NCHW":
+            model['grad_norm'] = tf.transpose(model['grad_norm'], [0, 2, 3, 1])
+        model['grad_norm'] =pred = self._upsample(model['grad_norm'], [1024,2048]) # [batch_size, 1024, 2048, 2]
+        if self._data_format == "NCHW":
+            model['grad_norm'] = tf.transpose(model['grad_norm'], [0, 3, 1, 2]) # [batch_size, 2, 1024, 2048]
+
+        with tf.variable_scope('wt'):
+            # Further featrue extractors, no dilations
+            # Input as gated grad-gt: [batch_size, 2, 1024, 2048]
+            # NOTE: no gating here
+            shape_dict['wt_convs1'] = [3,3,2,8]
+            with tf.variable_scope('convs1'):
+                # B0
+                model['wt_convs1'] = nn.WT_B0(self._data_format, model['grad_norm'], feed_dict,
+                                              shape_dict['wt_convs1'], var_dict)
+            shape_dict['wt_convs2'] = {}
+            shape_dict['wt_convs2']['side'] = [1,1,8,16]
+            shape_dict['wt_convs2']['convs'] = [[3,3,8,16],[3,3,16,16]]
+            with tf.variable_scope('convs2'):
+                # Downsample, B2
+                model['wt_convs2'] = nn.ResUnit_downsample_2convs(self._data_format, model['wt_convs1'],
+                                                                  feed_dict,
+                                                                  shape_dict['wt_convs2'],
+                                                                  var_dict)
+            shape_dict['wt_convs3'] = {}
+            shape_dict['wt_convs3']['side'] = [1,1,16,32]
+            shape_dict['wt_convs3']['convs'] = [[3,3,16,32],[3,3,32,32]]
+            with tf.variable_scope('convs3'):
+                # Downsample, B3
+                model['wt_convs3'] = nn.ResUnit_downsample_2convs(self._data_format, model['wt_convs2'],
+                                                                  feed_dict,
+                                                                  shape_dict['wt_convs3'],
+                                                                  var_dict)
+            shape_dict['wt_convs4'] = [[3,3,32,64],[3,3,64,64],[1,1,32,64]]
+            with tf.variable_scope('convs4'):
+                model['wt_convs4'] = nn.WT_Block(self._data_format, model['wt_convs3'], feed_dict,
+                                                 shape_dict['wt_convs4'], var_dict)
+            shape_dict['wt_tail'] = [[3,3,64,64],[3,3,64,16]]
+            with tf.variable_scope('tail'):
+                model['wt_tail'] = nn.WT_tail(self._data_format, model['wt_convs4'], feed_dict,
+                                              shape_dict['wt_tail'], var_dict)
+
 
         return model
 
@@ -259,6 +303,71 @@ class ResNet38:
 
         return train_step, loss_total
 
+    def train_gradswt(self, img, grad_weight, sem_gt, wt_gt, params):
+        '''This function only trains gradswt branch.
+            Input:  img [batch_size, 512, 1024, 3]
+                    grad_weight [batch_size, 1024, 2048, 1], inverse of sqrt(area)
+                    sem_gt [batch_size, 1024, 2048, 1]
+                    wt_gt [batch_size, 256, 512, 2], tf.float32, since downsampled twice from [1024,2048]
+                        * 1st is the discretized watershed transforms
+                        * 2nd is the weights for each discretization
+                    params: decay_rate, lr, batch_size
+        '''
+
+        ## Get prediction prepared
+        sem_gt0 = tf.image.resize_images(sem_gt, [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        model = self._build_model(img, sem_gt0, is_train=True)
+        pred = model['wt_tail'] #NOTE pred  [batch_size, 16, 256, 512] if "NCHW"
+
+        ### TFBoard summary
+        summ_pred = tf.argmax(tf.nn.softmax(tf.transpose(pred, [0, 2, 3, 1])), axis=3)
+        summ_pred = tf.expand_dims(summ_pred, axis=-1)
+        summ_pred = tf.cast(summ_pred, tf.float16)
+        pred_sum_op = tf.summary.image('pred_out', summ_pred)
+        ###
+
+        pred = tf.reshape(pred, [params['batch_size'], 16, 256*512]) #NOTE: pred [batch_size, 16, 256*512] if "NCHW"
+        if self._data_format == 'NCHW':
+            pred = tf.transpose(pred, [0, 2, 1]) #NOTE, pred [batch_size, 256*512, 16]
+
+        ## Get GTs prepared
+        sem_gt = tf.image.resize_images(sem_gt, [256,512], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        sem_gt = tf.reshape(sem_gt, [params['batch_size'],256*512]) #NOTE sem_gt [batch_size, 256*512]
+        wt_label = tf.reshape(wt_gt[:,:,:,0:1], [params['batch_size'], 256*512]) #NOTE wt_label [batch_size, 256*512]
+        wt_label = tf.cast(wt_label, tf.int32)
+        wt_weight = tf.reshape(wt_gt[:,:,:,1:2], [params['batch_size'], 256*512]) #NOTE wt_weight [batch_size, 256*512]
+        grad_weight = tf.image.resize_images(grad_weight, [256,512], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        grad_weight = tf.reshape(grad_weight, [params['batch_size'], 256*512])
+
+        ## Get valid pixels to compute
+        bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [batch_size, 256*512]
+        valid_pred = tf.boolean_mask(pred, bool_mask)
+        valid_wt_label = tf.boolean_mask(wt_label, bool_mask)
+        valid_wt_weight = tf.boolean_mask(wt_weight, bool_mask)
+        valid_grad_weight = tf.boolean_mask(grad_weight, bool_mask)
+
+        ## Compute weighted loss
+        # if no label is 13, set loss to 0.0
+        weighted_cross = tf.cond(tf.equal(tf.reduce_sum(tf.cast(bool_mask, tf.int32)), 0),
+                                 lambda: 0.0,
+                                 lambda: self._weight_cross_loss(valid_pred, valid_wt_label,valid_wt_weight, valid_grad_weight))
+        loss_total = weighted_cross + self._weight_decay(params['decay_rate'])
+
+        ## Minimize
+        update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
+        with tf.control_dependencies(update_ops):
+            train_step = tf.train.AdamOptimizer(params['lr']).minimize(loss_total)
+
+        return train_step, loss_total
+
+    def _weight_cross_loss(self, valid_pred, valid_wt_label, valid_wt_weight, valid_grad_weight):
+
+        cross_out = tf.nn.sparse_softmax_cross_entropy_with_logits(labels=valid_wt_label, logits=valid_pred) #NOTE same shape as valid_wt_label/valid_wt_weight
+        weighted_cross = tf.reduce_mean(tf.multiply(tf.multiply(cross_out, valid_wt_weight), valid_grad_weight)) * 100.0
+        weighted_loss = tf.reduce_mean(weighted_cross)
+
+        return weighted_loss
+
     def _get_sem_loss(self, model, sem_gt, params):
         '''
             Get the semantic loss.
@@ -290,14 +399,18 @@ class ResNet38:
         sem_gt0 = tf.image.resize_images(sem_gt, small_size, tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         model = self._build_model(image, sem_gt0, is_train=False)
 
-        pred = model['grad_norm'] #NOTE, pred is [batch_size, 2, 128, 256] if "NCHW"
+        pred = model['wt_tail'] #NOTE pred  [batch_size, 16, 256, 512] if "NCHW"
         if self._data_format == 'NCHW':
-            pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 128, 256, 2]
-        pred = self._upsample(pred, [1024,2048]) # [batch_size, 1024, 2048, 2]
+            pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 256, 512, 16]
+        pred = self._upsample(pred, [1024,2048]) # [batch_size, 1024, 2048, 16]
+        pred_label = tf.argmax(tf.nn.softmax(pred), axis=3)
+        pred_label = tf.expand_dims(pred_label, axis=-1)
+        pred_label = tf.cast(pred_label, tf.float32)
 
         # gate
-        pred = self._gate(sem_gt, pred)
+        pred_label = self._gate(sem_gt, pred_label) # [batch_size, 1024, 2048, 1]
+        pred_label = tf.cast(pred_label, tf.int32)
 
-        return pred
+        return pred_label
 
 
