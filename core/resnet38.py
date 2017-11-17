@@ -158,7 +158,7 @@ class ResNet38:
         with tf.variable_scope('wt'):
             # Further featrue extractors, no dilations
             # Input as gated grad-gt: [batch_size, 2, 1024, 2048]
-            grad_gt = nn.norm(self._data_format, grad_gt)
+            # grad_gt = nn.norm(self._data_format, grad_gt) # the GTs are already normalized
             model['gated_feat'] = self._gate(sem_gt, grad_gt)
             shape_dict = {}
             shape_dict['wt_convs1'] = [3,3,2,8]
@@ -205,9 +205,18 @@ class ResNet38:
             NOTE: The default data format is "NCHW", the function also works for "NHWC" without any changes in code.
         '''
 
-        # NOTE: Only gate class car for now
-        sem_bool = tf.equal(sem_input, 13) #NOTE [batch_size, 1, H, W]
-        sem_bin = tf.cast(sem_bool, tf.float32) #NOTE [batch_size, 1, H, W], zeros/ones
+        # NOTE: Gate all classes: [person, rider, car, truck, bus, train, motorcycle, bicycle]
+        # [11, 12, 13, 14, 15, 16, 17, 18]
+        bool_mask0 = tf.equal(sem_input, 11) # shape [batch_size, 1, H, W]
+        bool_mask1 = tf.equal(sem_input, 12) # shape [batch_size, 1, H, W]
+        bool_stack = tf.stack([bool_mask0, bool_mask1],axis=1) # shape [batch_size, 1,2, H, W]
+        for class_num in range(6):
+            new_bool = tf.expand_dims(tf.equal(sem_input, class_num+13), axis=1)
+            bool_stack = tf.concat([bool_stack, new_bool], axis=1) # shape: [batch_size, 1,2, H, W]
+        bool_mask = tf.reduce_any(bool_stack, axis=1) # shape: [batch_size, 1, H, W]
+        sem_bin = tf.cast(bool_mask, tf.float32) #NOTE [batch_size, 1, H, W], zeros/ones
+        # sem_bool = tf.equal(sem_input, 13) #NOTE [batch_size, 1, H, W]
+        # sem_bin = tf.cast(sem_bool, tf.float32) #NOTE [batch_size, 1, H, W], zeros/ones
 
         ## Gate
         gated_feat = tf.multiply(feat_input, sem_bin) #NOTE [batch_size, 4096, H, W]
@@ -285,8 +294,16 @@ class ResNet38:
         grad_weight = tf.reshape(grad_weight, [params['batch_size'], 256*512])
 
 
-        ## Get valid pixels to compute
-        bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [batch_size, 256*512]
+        ## Get valid pixels to compute: 
+        # [person, rider, car, truck, bus, train, motorcycle, bicycle]
+        # [11, 12, 13, 14, 15, 16, 17, 18]
+        bool_mask0 = tf.equal(sem_gt, 11) # shape [batch_size, 256*512]
+        bool_mask1 = tf.equal(sem_gt, 12) # shape [batch_size, 256*512]
+        bool_stack = tf.stack([bool_mask0, bool_mask1],axis=-1)
+        for class_num in range(6):
+            new_bool = tf.expand_dims(tf.equal(sem_gt, class_num+13), axis=-1)
+            bool_stack = tf.concat([bool_stack, new_bool], axis=-1) # shape: [batch_size, 256*512, 8]
+        bool_mask = tf.reduce_any(bool_stack, axis=-1) # shape: [batch_size, 256*512]
         valid_pred = tf.boolean_mask(pred, bool_mask)
         valid_wt_label = tf.boolean_mask(wt_label, bool_mask)
         valid_wt_weight = tf.boolean_mask(wt_weight, bool_mask)

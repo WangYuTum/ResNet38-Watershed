@@ -11,7 +11,9 @@ from core import resnet38
 
 # Prepare dataset
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-train_data_params = {'mode': 'train_wt',
+config_gpu = tf.ConfigProto()
+config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.4
+train_data_params = {'mode': 'train_wt_full',
                      'batch_size': 6}
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
@@ -27,7 +29,7 @@ model_params = {'num_classes': 19,
                 'data_format': "NCHW", # optimal for cudnn
                 'save_path': '../data/saved_weights/',
                 'tsboard_save_path': '../data/tsboard/'}
-train_ep = 21
+train_ep = 22
 save_ep = 3
 num_train = 2975
 
@@ -48,10 +50,10 @@ TrainLoss_sum = tf.summary.scalar('train_loss', loss)
 Train_summary = tf.summary.merge_all()
 init = tf.global_variables_initializer()
 
-with tf.Session() as sess:
+with tf.Session(config=config_gpu) as sess:
     save_path = model_params['save_path']
     batch_size = model_params['batch_size']
-    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'wt/adam_batch6_weighted/', sess.graph)
+    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'wt_full/adam_batch6_weighted/', sess.graph)
 
     sess.run(init)
     num_iters = np.int32(num_train / batch_size) + 1
@@ -68,7 +70,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/wt_adam_batch6_weighted/watershed_preimga1_wt8s_ep%d.npy'%(epoch)
+                save_name = '/wt_full_adam_batch6_weighted/watershed_preimga1_wt8s_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 

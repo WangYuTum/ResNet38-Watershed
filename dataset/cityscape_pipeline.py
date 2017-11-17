@@ -40,7 +40,7 @@ class CityDataSet():
         self._train_size = 2975
         self._TFrecord_file = None
         self._dataset = None
-        self._valimg_indices = None
+        self._img_indices = None
         self._batch_idx = 0
 
         self._pred_save_path = params.get('pred_save_path','../data/pred_trainIDs')
@@ -78,7 +78,7 @@ class CityDataSet():
             self._TFrecord_file = '/work/wangyu/cityscape_train.tfrecord'
         elif self._mode == 'val_sem':
             self._TFrecord_file = '/work/wangyu/cityscape_val.tfrecord'
-            self._valimg_indices = self._load_valimg_indicies()
+            self._valimg_indices = self._load_img_indicies()
         # TODO
         elif self._mode == 'test_sem':
             self._TFrecord_file = '/work/wangyu/cityscape_test.tfrecord'
@@ -86,10 +86,10 @@ class CityDataSet():
             self._TFrecord_file = '/work/wangyu/cityscape_train.tfrecord'
         elif self._mode == 'val_grad':
             self._TFrecord_file = '/work/wangyu/cityscape_val.tfrecord'
-        elif self._mode == 'train_wt':
-            self._TFrecord_file = '/work/wangyu/cityscape_train2.tfrecord'
-        elif self._mode == 'val_wt':
-            self._TFrecord_file = '/work/wangyu/cityscape_val2.tfrecord'
+        elif self._mode == 'train_wt_full':
+            self._TFrecord_file = '/work/wangyu/cityscape_train_full.tfrecord'
+        elif self._mode == 'val_wt_full':
+            self._TFrecord_file = '/work/wangyu/cityscape_val_full.tfrecord'
         else:
             sys.exit('No valid mode!')
         self._dataset = self._build_pipeline()
@@ -219,7 +219,7 @@ class CityDataSet():
 
         return transformed
 
-    def _wt_train_transform(self, example):
+    def _wtfull_train_transform(self, example):
         '''Given a standardized example: dictonary
             Return: a dictionary, where RGB_image and sem_gt/wt_gt is transformed
 
@@ -326,7 +326,7 @@ class CityDataSet():
 
         return dataset
 
-    def _build_wttrain_pipeline(self, TFrecord_file):
+    def _build_wtfulltrain_pipeline(self, TFrecord_file):
 
         '''
             Given the .tfrecord path, build a datapipeline using member functions
@@ -338,13 +338,13 @@ class CityDataSet():
         dataset = dataset.repeat()
         dataset = dataset.map(self._parse_single_record, num_threads=6, output_buffer_size=12)
         dataset = dataset.map(self._image_standardization, num_threads=6, output_buffer_size=12)
-        dataset = dataset.map(self._wt_train_transform, num_threads=6, output_buffer_size=12)
+        dataset = dataset.map(self._wtfull_train_transform, num_threads=6, output_buffer_size=12)
         dataset = dataset.shuffle(buffer_size=1500)
         dataset = dataset.batch(self._batch_size)
 
         return dataset
 
-    def _build_wtval_pipeline(self, TFrecord_file):
+    def _build_wtfullval_pipeline(self, TFrecord_file):
 
         '''
             Given the .tfrecord path, build a datapipeline using member functions
@@ -373,10 +373,10 @@ class CityDataSet():
             dataset = self._build_gradtrain_pipeline(TFrecord_file=self._TFrecord_file)
         elif self._mode == 'val_grad':
             dataset = self._build_gradval_pipeline(TFrecord_file=self._TFrecord_file)
-        elif self._mode == 'train_wt':
-            dataset = self._build_wttrain_pipeline(TFrecord_file=self._TFrecord_file)
-        elif self._mode == 'val_wt':
-            dataset = self._build_wtval_pipeline(TFrecord_file=self._TFrecord_file)
+        elif self._mode == 'train_wt_full':
+            dataset = self._build_wtfulltrain_pipeline(TFrecord_file=self._TFrecord_file)
+        elif self._mode == 'val_wt_full':
+            dataset = self._build_wtfullval_pipeline(TFrecord_file=self._TFrecord_file)
         else:
             sys.exit('Mode {} is not supported.'.format(self._mode))
 
@@ -452,7 +452,7 @@ class CityDataSet():
             Note that this function only works during inference.
         '''
         for i in range(self._batch_idx, self._batch_idx+self._batch_size):
-            img_inx = self._valimg_indices[i].split('/')
+            img_inx = self._img_indices[i].split('/')
             # eg, ../data/CityDatabase/leftImg8bit/val/frankfurt/frankfurt_000000_000294_leftImg8bit.png
             fname = img_inx[6]
             fname = fname.split('_')
@@ -505,18 +505,21 @@ class CityDataSet():
         '''
             Load val image names for inference.
         '''
-        print('Loading val set indices...')
+        if self._mode.find('test') != -1:
+            mode = 'test'
+        elif self._mode.find('val') != -1:
+            mode = 'val'
+        else:
+            sys.exit('Invalid mode for loading indices.')
+        print('Loading {} set indices...'.format(mode))
         files_img = []
 
-        if self._mode != 'val_sem':
-            sys.exit('Error: Wrong mode during validation.')
-
-        search_img = os.path.join('../data/CityDatabase', 'leftImg8bit', 'val',
+        search_img = os.path.join('../data/CityDatabase', 'leftImg8bit', mode,
                                   '*', '*_leftImg8bit.png')
         files_img = glob.glob(search_img)
         files_img.sort()
 
-        print('Loaded val image indices: {}'.format(len(files_img)))
+        print('Loaded {0} image indices: {1}'.format(mode, len(files_img)))
         return (files_img)
 
 # Only used for test purpose
