@@ -163,17 +163,24 @@ class ResNet38:
             returns gated feature maps, where non-relevant classes on the
             feature maps are set to zero
             Input: sem_input [batch_size, 1, H, W]
-                   feat_input [batch_size, 4096, H, W]
-            Output: gated feature maps [batch_size, H, W, 4096]
+                   feat_input [batch_size, C, H, W]
+            Output: gated feature maps [batch_size, H, W, C]
             NOTE: The default data format is "NCHW", the function also works for "NHWC" without any changes in code.
         '''
 
-        # NOTE: Only gate class car for now
-        sem_bool = tf.equal(sem_input, 13) #NOTE [batch_size, 1, H, W]
-        sem_bin = tf.cast(sem_bool, tf.float32) #NOTE [batch_size, 1, H, W], zeros/ones
+        # NOTE: Gate all classes: [person, rider, car, truck, bus, train, motorcycle, bicycle]
+        # [11, 12, 13, 14, 15, 16, 17, 18]
+        bool_mask0 = tf.equal(sem_input, 11) # shape [batch_size, 1, H, W]
+        bool_mask1 = tf.equal(sem_input, 12) # shape [batch_size, 1, H, W]
+        bool_stack = tf.stack([bool_mask0, bool_mask1],axis=1) # shape [batch_size, 1,2, H, W]
+        for class_num in range(6):
+            new_bool = tf.expand_dims(tf.equal(sem_input, class_num+13), axis=1)
+            bool_stack = tf.concat([bool_stack, new_bool], axis=1) # shape: [batch_size, 1,2, H, W]
+        bool_mask = tf.reduce_any(bool_stack, axis=1) # shape: [batch_size, 1, H, W]
+        sem_bin = tf.cast(bool_mask, tf.float32) #NOTE [batch_size, 1, H, W], zeros/ones
 
         ## Gate
-        gated_feat = tf.multiply(feat_input, sem_bin) #NOTE [batch_size, 4096, H, W]
+        gated_feat = tf.multiply(feat_input, sem_bin) #NOTE [batch_size, C, H, W]
 
         return gated_feat
 
@@ -230,17 +237,26 @@ class ResNet38:
         if self._data_format == 'NCHW':
             pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 64, 128, 2]
 
-        # The predicted graddir and GT are already normalized
+        ## The predicted graddir and GT are already normalized
         product = tf.reduce_sum(tf.multiply(pred,grad_gt[:,:,:,0:2]), axis=3) #NOTE product [batch_size, 64,128]
         product = tf.maximum(product, -0.99)
         product = tf.minimum(product, 0.99)
         cos_out = tf.acos(product)
         sem_gt = tf.reshape(sem_gt, [params['batch_size'],64,128]) #NOTE sem_gt [batch_size,64,128]
-        bool_mask = tf.equal(sem_gt,13) #NOTE bool_mask [batch_size,64,128]
-        valid_weight = tf.boolean_mask(grad_gt[:,:,:,2:3], bool_mask)
-        # if no label is 13, set loss to 0.0
+        # Get valid pixels to compute: [person, rider, car, truck, bus, train, motorcycle, bicycle]
+        # [11, 12, 13, 14, 15, 16, 17, 18]
+        bool_mask0 = tf.equal(sem_gt, 11) # shape [batch_size, 64, 128]
+        bool_mask1 = tf.equal(sem_gt, 12) # shape [batch_size, 64, 128]
+        bool_stack = tf.stack([bool_mask0, bool_mask1],axis=-1) # shape [batch_size, 64, 128, 2]
+        for class_num in range(6):
+            new_bool = tf.expand_dims(tf.equal(sem_gt, class_num+13), axis=-1) # shape [batch_size, 64, 128, 1]
+            bool_stack = tf.concat([bool_stack, new_bool], axis=-1) # shape: [batch_size, 64, 128, 2+(class_num+1)]
+        bool_mask = tf.reduce_any(bool_stack, axis=-1) # shape: [batch_size, 64, 128]
+        valid_grad_weight = tf.boolean_mask(grad_gt[:,:,:,2:3], bool_mask)
+
+        # if there's no valid label, set loss to 0.0
         valid_cos_out = tf.cond(tf.equal(tf.reduce_sum(tf.cast(bool_mask, tf.int32)), 0), lambda: 0.0, lambda: tf.boolean_mask(cos_out, bool_mask))
-        loss_grad = tf.reduce_mean(tf.square(valid_cos_out) * valid_weight * 100.0)
+        loss_grad = tf.reduce_mean(tf.square(valid_cos_out) * valid_grad_weight * 100.0)
         loss_grad_valid = tf.cond(tf.is_nan(loss_grad), lambda: 0.0, lambda: loss_grad)
         loss_grad_total = loss_grad_valid + self._weight_decay(params['decay_rate'])
 

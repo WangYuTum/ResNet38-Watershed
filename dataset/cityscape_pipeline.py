@@ -85,6 +85,10 @@ class CityDataSet():
             self._TFrecord_file = '/work/wangyu/cityscape_train2.tfrecord'
         elif self._mode == 'val_grad':
             self._TFrecord_file = '/work/wangyu/cityscape_val2.tfrecord'
+        elif self._mode == 'train_grad_full':
+            self._TFrecord_file = '/work/wangyu/cityscape_train_full.tfrecord'
+        elif self._mode == 'val_grad_full':
+            self._TFrecord_file = '/work/wangyu/cityscape_train_val.tfrecord'
         else:
             sys.exit('No valid mode!')
         self._dataset = self._build_pipeline()
@@ -200,6 +204,7 @@ class CityDataSet():
         return transformed
 
     def _grad_train_transform(self, example):
+        # NOTE: the grad_full pipeline also use this function
         '''Given a standardized example: dictonary
             Return: a dictionary, where RGB_image and sem_gt/grad_gt is transformed
 
@@ -277,7 +282,7 @@ class CityDataSet():
         return dataset
 
     def _build_gradtrain_pipeline(self, TFrecord_file):
-
+        # NOTE: the grad_full pipeline also use this function
         '''
             Given the .tfrecord path, build a datapipeline using member functions
             Return: A TF dataset object
@@ -295,7 +300,7 @@ class CityDataSet():
         return dataset
 
     def _build_gradval_pipeline(self, TFrecord_file):
-
+        # NOTE: the grad_full pipeline also use this function
         '''
             Given the .tfrecord path, build a datapipeline using member functions
             Return: A TF dataset object
@@ -323,6 +328,10 @@ class CityDataSet():
         elif self._mode == 'train_grad':
             dataset = self._build_gradtrain_pipeline(TFrecord_file=self._TFrecord_file)
         elif self._mode == 'val_grad':
+            dataset = self._build_gradval_pipeline(TFrecord_file=self._TFrecord_file)
+        elif self._mode == 'train_grad_full':
+            dataset = self._build_gradtrain_pipeline(TFrecord_file=self._TFrecord_file)
+        elif self._mode == 'val_grad_full':
             dataset = self._build_gradval_pipeline(TFrecord_file=self._TFrecord_file)
         else:
             sys.exit('Mode {} is not supported.'.format(self._mode))
