@@ -220,11 +220,11 @@ class ResNet38:
 
     def train_grad(self, image, sem_gt, grad_gt, params):
         ''' This function only trains graddir branch.
-            Input: Image [batch_size, 512, 1024, 3]
-                   sem_gt [batch_size, 64, 128, 1]
-                   grad_gt [batch_size, 64, 128, 3]
-                        * [batch_size, 64, 128, 0:2] is the grad_gt
-                        * [batch_size, 64, 128, 2:3] is the inverse of sqrt(area)
+            Input: Image [batch_size, 1024, 2048, 3]
+                   sem_gt [batch_size, 128, 256, 1]
+                   grad_gt [batch_size, 128, 256, 3]
+                        * [batch_size, 128, 256, 0:2] is the grad_gt
+                        * [batch_size, 128, 256, 2:3] is the inverse of sqrt(area)
                    params: decay_rate, lr
         '''
 
@@ -233,25 +233,25 @@ class ResNet38:
         ## NOTE Get semantic loss
         #sem_loss = self._get_sem_loss(model, sem_gt, params)
 
-        pred = model['grad_norm'] #NOTE pred  [batch_size, 2, 64,128] if "NCHW"
+        pred = model['grad_norm'] #NOTE pred  [batch_size, 2, 128,256] if "NCHW"
         if self._data_format == 'NCHW':
-            pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 64, 128, 2]
+            pred = tf.transpose(pred, [0, 2, 3, 1]) #NOTE, pred is [batch_size, 128, 256, 2]
 
         ## The predicted graddir and GT are already normalized
-        product = tf.reduce_sum(tf.multiply(pred,grad_gt[:,:,:,0:2]), axis=3) #NOTE product [batch_size, 64,128]
+        product = tf.reduce_sum(tf.multiply(pred,grad_gt[:,:,:,0:2]), axis=3) #NOTE product [batch_size, 128,256]
         product = tf.maximum(product, -0.99)
         product = tf.minimum(product, 0.99)
         cos_out = tf.acos(product)
-        sem_gt = tf.reshape(sem_gt, [params['batch_size'],64,128]) #NOTE sem_gt [batch_size,64,128]
+        sem_gt = tf.reshape(sem_gt, [params['batch_size'],128,256]) #NOTE sem_gt [batch_size,128,256]
         # Get valid pixels to compute: [person, rider, car, truck, bus, train, motorcycle, bicycle]
         # [11, 12, 13, 14, 15, 16, 17, 18]
-        bool_mask0 = tf.equal(sem_gt, 11) # shape [batch_size, 64, 128]
-        bool_mask1 = tf.equal(sem_gt, 12) # shape [batch_size, 64, 128]
-        bool_stack = tf.stack([bool_mask0, bool_mask1],axis=-1) # shape [batch_size, 64, 128, 2]
+        bool_mask0 = tf.equal(sem_gt, 11) # shape [batch_size, 128, 256]
+        bool_mask1 = tf.equal(sem_gt, 12) # shape [batch_size, 128, 256]
+        bool_stack = tf.stack([bool_mask0, bool_mask1],axis=-1) # shape [batch_size, 128, 256, 2]
         for class_num in range(6):
-            new_bool = tf.expand_dims(tf.equal(sem_gt, class_num+13), axis=-1) # shape [batch_size, 64, 128, 1]
-            bool_stack = tf.concat([bool_stack, new_bool], axis=-1) # shape: [batch_size, 64, 128, 2+(class_num+1)]
-        bool_mask = tf.reduce_any(bool_stack, axis=-1) # shape: [batch_size, 64, 128]
+            new_bool = tf.expand_dims(tf.equal(sem_gt, class_num+13), axis=-1) # shape [batch_size, 128, 256, 1]
+            bool_stack = tf.concat([bool_stack, new_bool], axis=-1) # shape: [batch_size, 128, 256, 2+(class_num+1)]
+        bool_mask = tf.reduce_any(bool_stack, axis=-1) # shape: [batch_size, 128, 256]
         valid_grad_weight = tf.boolean_mask(grad_gt[:,:,:,2:3], bool_mask)
 
         # if there's no valid label, set loss to 0.0
@@ -270,11 +270,13 @@ class ResNet38:
             # train_step = tf.train.MomentumOptimizer(params['lr'],0.9).minimize(loss_total)
 
         ###
-        pred_out_sum = tf.summary.image('pred_out', tf.concat([pred, tf.zeros([params['batch_size'], 64, 128, 1])], axis=-1))
+        pred_out_sum = tf.summary.image('pred_out', tf.concat([pred, tf.zeros([params['batch_size'], 128, 256, 1])], axis=-1))
         ###
 
         return train_step, loss_total
 
+
+    # TODO: set the correct shape/size
     def _get_sem_loss(self, model, sem_gt, params):
         '''
             Get the semantic loss.

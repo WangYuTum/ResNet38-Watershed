@@ -89,6 +89,10 @@ class CityDataSet():
             self._TFrecord_file = '/work/wangyu/cityscape_train_full.tfrecord'
         elif self._mode == 'val_grad_full':
             self._TFrecord_file = '/work/wangyu/cityscape_train_val.tfrecord'
+        elif self._mode == 'train_grad_full_full':
+            self._TFrecord_file = '/work/wangyu/cityscape_train_full.tfrecord'
+        elif self._mode == 'val_grad_full_full':
+            self._TFrecord_file = '/work/wangyu/cityscape_train_val.tfrecord'
         else:
             sys.exit('No valid mode!')
         self._dataset = self._build_pipeline()
@@ -232,6 +236,28 @@ class CityDataSet():
 
         return transformed
 
+    def _gradfullfull_train_transform(self, example):
+        '''Given a standardized example: dictonary
+            Return: a dictionary, where RGB_image and sem_gt/grad_gt is transformed
+
+            Transformation:
+                * Resize sem_gt/grad_gt by 1/(8) for loss calculation, [128,256]
+            After this transformation:
+                * Image has shape: [1024,2048,3], tf.float32
+                * sem_gt has shape: [128,256,1], tf.int32
+                * grad_gt has shape: [128,256,3], tf.float32
+        '''
+        sem_gt = tf.image.resize_images(example['sem_gt'], [128,256], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+        grad_gt = tf.image.resize_images(example['grad_gt'], [128,256], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+
+        # Pack the result
+        transformed = {}
+        transformed['img'] = example['img']
+        transformed['sem_gt'] = sem_gt
+        transformed['grad_gt'] = grad_gt
+
+        return transformed
+
     def _build_semtrain_pipeline(self, TFrecord_file):
         '''
             Given the .tfrecord path, build a datapipeline using member functions
@@ -299,6 +325,18 @@ class CityDataSet():
 
         return dataset
 
+    def _build_gradfullfulltrain_pipeline(self, TFrecord_file):
+        dataset = tf.contrib.data.TFRecordDataset(TFrecord_file, "GZIP")
+        dataset = dataset.repeat()
+        dataset = dataset.map(self._parse_single_record, num_threads=3, output_buffer_size=9)
+        dataset = dataset.map(self._image_standardization, num_threads=3, output_buffer_size=9)
+        dataset = dataset.map(self._gradfullfull_train_transform, num_threads=3, output_buffer_size=9)
+        dataset = dataset.shuffle(buffer_size=1500)
+        dataset = dataset.batch(self._batch_size)
+
+        return dataset
+
+
     def _build_gradval_pipeline(self, TFrecord_file):
         # NOTE: the grad_full pipeline also use this function
         '''
@@ -333,6 +371,8 @@ class CityDataSet():
             dataset = self._build_gradtrain_pipeline(TFrecord_file=self._TFrecord_file)
         elif self._mode == 'val_grad_full':
             dataset = self._build_gradval_pipeline(TFrecord_file=self._TFrecord_file)
+        elif self._mode == 'train_grad_full_full':
+            dataset = self._build_gradfullfulltrain_pipeline(TFrecord_file=self._TFrecord_file)
         else:
             sys.exit('Mode {} is not supported.'.format(self._mode))
 
