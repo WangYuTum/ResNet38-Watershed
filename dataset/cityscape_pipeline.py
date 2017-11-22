@@ -90,6 +90,10 @@ class CityDataSet():
             self._TFrecord_file = '/work/wangyu/cityscape_train2.tfrecord'
         elif self._mode == 'val_gradswt':
             self._TFrecord_file = '/work/wangyu/cityscape_val2.tfrecord'
+        elif self._mode == 'train_gradswt_full':
+            self._TFrecord_file = '/work/wangyu/cityscape_train_full.tfrecord'
+        elif self._mode == 'val_gradswt_full':
+            self._TFrecord_file = '/work/wangyu/cityscape_val_full.tfrecord'
         else:
             sys.exit('No valid mode!')
         self._dataset = self._build_pipeline()
@@ -408,9 +412,9 @@ class CityDataSet():
             dataset = self._build_gradtrain_pipeline(TFrecord_file=self._TFrecord_file)
         elif self._mode == 'val_grad':
             dataset = self._build_gradval_pipeline(TFrecord_file=self._TFrecord_file)
-        elif self._mode == 'train_gradswt':
+        elif self._mode == 'train_gradswt' or self._mode == 'train_gradswt_full':
             dataset = self._build_gradswttrain_pipeline(TFrecord_file=self._TFrecord_file)
-        elif self._mode == 'val_gradswt':
+        elif self._mode == 'val_gradswt' or self._mode == 'val_gradswt_full':
             dataset = self._build_gradswtval_pipeline(TFrecord_file=self._TFrecord_file)
         else:
             sys.exit('Mode {} is not supported.'.format(self._mode))

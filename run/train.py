@@ -11,7 +11,7 @@ from core import resnet38
 
 # Prepare dataset
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-train_data_params = {'mode': 'train_gradswt',
+train_data_params = {'mode': 'train_gradswt_full',
                      'batch_size': 3}
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
@@ -20,14 +20,14 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/watershed_pre-gradswt.npy',
+                'feed_weight': '../data/saved_weights/gradswt_full_adam_batch3/watershed_pregradswta1_gradswt8s_ep6.npy',
                 'batch_size': 3,
                 'decay_rate': 1e-5,
                 'lr': 5e-6,
                 'data_format': "NCHW", # optimal for cudnn
                 'save_path': '../data/saved_weights/',
                 'tsboard_save_path': '../data/tsboard/'}
-train_ep = 19
+train_ep = 13
 save_ep = 3
 num_train = 2975
 
@@ -51,7 +51,7 @@ init = tf.global_variables_initializer()
 with tf.Session() as sess:
     save_path = model_params['save_path']
     batch_size = model_params['batch_size']
-    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'gradswt/adam_batch3/', sess.graph)
+    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'gradswt_full/adam_batch3/', sess.graph)
 
     sess.run(init)
     num_iters = np.int32(num_train / batch_size) + 1
@@ -68,7 +68,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/gradswt_adam_batch3/watershed_pregradswta1_gradswt8s_ep%d.npy'%(epoch)
+                save_name = '/gradswt_full_adam_batch3/watershed_pregradswta1_gradswt8s_ep%d.npy'%(epoch+6)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 
