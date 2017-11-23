@@ -22,7 +22,7 @@ class ResNet38:
 
         self._num_classes = params.get('num_classes', 19)
 
-    def _build_model(self, image, sem_gt, is_train=False):
+    def _build_model(self, image, is_train=False):
         '''If is_train, save weight to self._var_dict,
            otherwise, don't save weights
            '''
@@ -40,7 +40,6 @@ class ResNet38:
 
         if self._data_format == "NCHW":
             image = tf.transpose(image, [0, 3, 1, 2])
-            sem_gt = tf.transpose(sem_gt, [0, 3, 1, 2])
 
         shape_dict = {}
         shape_dict['B0'] = [3,3,3,64]
@@ -99,48 +98,52 @@ class ResNet38:
                                                                    feed_dict,
                                                                    shape_dict['B4']['convs'][1],
                                                                    var_dict=var_dict)
-           # # B5_1: [H/8, W/8, 512] -> [H/8, W/8, 1024]
-           # shape_dict['B5_1'] = {}
-           # shape_dict['B5_1']['side'] = [1,1,512,1024]
-           # shape_dict['B5_1']['convs'] = [[3,3,512,512],[3,3,512,1024]]
-           # with tf.variable_scope('B5_1'):
-           #     model['B5_1'] = nn.ResUnit_hybrid_dilate_2conv(self._data_format, model['B4_6'],
-           #                                                        feed_dict,
-           #                                                        shape_dict['B5_1'],
-           #                                                        var_dict=var_dict)
-           # # B5_2, B5_3: [H/8, W/8, 1024]
-           # # Shape for B5_2, B5_3
-           # shape_dict['B5_2_3'] = [[3,3,1024,512],[3,3,512,1024]]
-           # for i in range(2):
-           #     with tf.variable_scope('B5_'+str(i+2)):
-           #         model['B5_'+str(i+2)] = nn.ResUnit_full_dilate_2convs(self._data_format, model['B5_'+str(i+1)],
-           #                                           feed_dict, shape_dict['B5_2_3'],
-           #                                           var_dict=var_dict)
+        with tf.variable_scope('semantic'):
+            # B5_1: [H/8, W/8, 512] -> [H/8, W/8, 1024]
+            shape_dict['B5_1'] = {}
+            shape_dict['B5_1']['side'] = [1,1,512,1024]
+            shape_dict['B5_1']['convs'] = [[3,3,512,512],[3,3,512,1024]]
+            with tf.variable_scope('B5_1'):
+                model['B5_1'] = nn.ResUnit_hybrid_dilate_2conv(self._data_format, model['B4_6'],
+                                                                   feed_dict,
+                                                                   shape_dict['B5_1'],
+                                                                   var_dict=var_dict)
+            # B5_2, B5_3: [H/8, W/8, 1024]
+            # Shape for B5_2, B5_3
+            shape_dict['B5_2_3'] = [[3,3,1024,512],[3,3,512,1024]]
+            for i in range(2):
+                with tf.variable_scope('B5_'+str(i+2)):
+                    model['B5_'+str(i+2)] = nn.ResUnit_full_dilate_2convs(self._data_format, model['B5_'+str(i+1)],
+                                                      feed_dict, shape_dict['B5_2_3'],
+                                                      var_dict=var_dict)
 
-           # # B6: [H/8, W/8, 1024] -> [H/8, W/8, 2048]
-           # shape_dict['B6'] = [[1,1,1024,512],[3,3,512,1024],[1,1,1024,2048]]
-           # with tf.variable_scope('B6'):
-           #     model['B6'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B5_3'],
-           #                                                      feed_dict,
-           #                                                      shape_dict['B6'],
-           #                                                      dropout=dropout,
-           #                                                      var_dict=var_dict)
-           # # B7: [H/8, W/8, 2048] -> [H/8, W/8, 4096]
-           # shape_dict['B7'] = [[1,1,2048,1024],[3,3,1024,2048],[1,1,2048,4096]]
-           # with tf.variable_scope('B7'):
-           #     model['B7'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B6'],
-           #                                                      feed_dict,
-           #                                                      shape_dict['B7'],
-           #                                                      dropout=dropout,
-           #                                                      var_dict=var_dict)
-       # with tf.variable_scope('semantic'):
-       #     shape_dict['semantic'] = [[3,3,4096,512],[3,3,512,self._num_classes]]
-       #     model['semantic'] = nn.ResUnit_tail(self._data_format, model['B7'], feed_dict,
-       #                                         shape_dict['semantic'], var_dict)
+            # B6: [H/8, W/8, 1024] -> [H/8, W/8, 2048]
+            shape_dict['B6'] = [[1,1,1024,512],[3,3,512,1024],[1,1,1024,2048]]
+            with tf.variable_scope('B6'):
+                model['B6'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B5_3'],
+                                                                 feed_dict,
+                                                                 shape_dict['B6'],
+                                                                 dropout=dropout,
+                                                                 var_dict=var_dict)
+            # B7: [H/8, W/8, 2048] -> [H/8, W/8, 4096]
+            shape_dict['B7'] = [[1,1,2048,1024],[3,3,1024,2048],[1,1,2048,4096]]
+            with tf.variable_scope('B7'):
+                model['B7'] = nn.ResUnit_hybrid_dilate_3conv(self._data_format, model['B6'],
+                                                                 feed_dict,
+                                                                 shape_dict['B7'],
+                                                                 dropout=dropout,
+                                                                 var_dict=var_dict)
+            # Semantic classification layer
+            shape_dict['semantic'] = [[3,3,4096,512],[3,3,512,self._num_classes]]
+            model['semantic'] = nn.ResUnit_tail(self._data_format, model['B7'], feed_dict,
+                                                shape_dict['semantic'], var_dict)
 
-        # The graddir unique part: conv1 + conv2 + 3*conv3(kernel: [1x1])
-        # Gating operation, need semantic GT while training and inference
-        model['gated_feat'] = self._gate(sem_gt, model['B4_6'])
+        # Gating op, semantic comes from semantic layer
+        sem_out = tf.expand_dims(tf.argmax(tf.nn.softmax(model['semantic'], dim=1), axis=1), axis=1)
+        if self._data_format == 'NCHW':
+            pred_sem = tf.transpose(sem_out, [0, 2, 3, 1]) #NOTE, pred_sem is [batch_size, 64, 128, 1]
+        pred_sem_sum = tf.summary.image('pred_sem', tf.cast(pred_sem, tf.float16))
+        model['gated_feat'] = self._gate(sem_out, model['B4_6']) # sem_out [batch, 1, 64, 128], feature: [batch, 512, 64, 128]
 
         with tf.variable_scope("graddir"):
             # Further feature extractors
@@ -228,10 +231,10 @@ class ResNet38:
                    params: decay_rate, lr
         '''
 
-        model = self._build_model(image, sem_gt, is_train=True)
+        model = self._build_model(image, is_train=True)
 
         ## NOTE Get semantic loss
-        #sem_loss = self._get_sem_loss(model, sem_gt, params)
+        sem_loss = self._get_sem_loss(model, sem_gt, params)
 
         pred = model['grad_norm'] #NOTE pred  [batch_size, 2, 64,128] if "NCHW"
         if self._data_format == 'NCHW':
@@ -261,8 +264,8 @@ class ResNet38:
         loss_grad_total = loss_grad_valid + self._weight_decay(params['decay_rate'])
 
         ## NOTE Total loss
-        # loss_total = sem_loss + loss_grad_total
-        loss_total = loss_grad_total
+        loss_total = sem_loss + loss_grad_total
+        # loss_total = loss_grad_total
 
         update_ops = tf.get_collection(tf.GraphKeys.UPDATE_OPS)
         with tf.control_dependencies(update_ops):
@@ -270,7 +273,7 @@ class ResNet38:
             # train_step = tf.train.MomentumOptimizer(params['lr'],0.9).minimize(loss_total)
 
         ###
-        pred_out_sum = tf.summary.image('pred_out', tf.concat([pred, tf.zeros([params['batch_size'], 64, 128, 1])], axis=-1))
+        pred_grad_sum = tf.summary.image('grad_out', tf.concat([pred, tf.zeros([params['batch_size'], 64, 128, 1])], axis=-1))
         ###
 
         return train_step, loss_total
