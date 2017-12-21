@@ -12,10 +12,10 @@ from core import resnet38
 from eval import evalPixelSemantic
 
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-config_gpu = tf.ConfigProto()
-config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.9
-test_data_params = {'mode': 'val_grad', #NOTE: later change to val_semgrad
-                     'batch_size': 2}
+#config_gpu = tf.ConfigProto()
+#config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.9
+test_data_params = {'mode': 'test_final',
+                     'batch_size': 5}
 
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
@@ -24,22 +24,24 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/semgrad_adam_batch3/watershed_presema1_grad8s_ep18.npy',
-                'batch_size': 2,
+                'feed_weight': '../data/saved_weights/final_adam_batch3/watershed_presemgradswta1_final8s_ep3.npy',
+                'batch_size': 5,
                 'data_format': "NCHW", # optimal for cudnn
                 }
 
 num_val = 500
 num_test = 1525
-iterations = 2
+num_train = 2975
+# iterations = 5
+iterations = int(num_train / model_params['batch_size'])
 batch = model_params['batch_size']
 
 res38 = resnet38.ResNet38(model_params)
-predict = res38.inf(image=next_batch['img'], sem_gt=next_batch['sem_gt'])
+[sem_label, wt_label, sem_prob] = res38.inf(image=next_batch['img'])
 init = tf.global_variables_initializer()
 
-# with tf.Session() as sess:
-with tf.Session(config=config_gpu) as sess:
+with tf.Session() as sess:
+#with tf.Session(config=config_gpu) as sess:
 
     sess.run(init)
     print('Finished building inference network ResNet38-8s')
@@ -47,11 +49,16 @@ with tf.Session(config=config_gpu) as sess:
     print('Start inference...')
     for i in range(iterations):
         print('iter {0}:'.format(i))
-        pred_out = sess.run(predict) #NOTE: [batch_size, 1024, 2048, 2]
+        [sem_label_, wt_label_, sem_prob_] = sess.run([sem_label, wt_label, sem_prob])
+        pred_sem_label = np.squeeze(sem_label_) # [batch_size, 1024, 2048]
+        pred_wt_label = np.squeeze(wt_label_) # [batch_size, 1024, 2048]
+        CityData.save_trainID_img(pred_sem_label, pred_wt_label, True, True)
+        #TODO: save sem_prob_
 
-        for j in range(batch):
-            pred_img = np.concatenate((pred_out[j,:,:,:],np.zeros((1024,2048,1))), axis=-1)
-            pred_img = np.squeeze(pred_img)
-            print('Save pred to {0}'.format("pred_grad"+str(i*batch+j)+".png"))
-            imsave("pred_grad%d.png"%(i*batch+j), pred_img)
-
+    #print("Inference done! Start transforming to colored ...")
+    #CityData.pred_to_color()
+    print("Start transforming to labelIDs ...")
+    CityData.pred_to_labelID()
+    print("Transform done! Ready to generate evaluation files.")
+    print("Start evaluating semantic accuracy ...")
+    accuracy = evalPixelSemantic.run_eval('../data/sempred')

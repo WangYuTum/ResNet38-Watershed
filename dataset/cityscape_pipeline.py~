@@ -95,7 +95,7 @@ class CityDataSet():
             self._TFrecord_file = '/work/wangyu/cityscape_val_full.tfrecord'
             self._img_indices = self._load_img_indicies()
         elif self._mode == 'test_final':
-            self._TFrecord_file = '/work/wangyu/cityscape_train_full.tfrecord'
+            self._TFrecord_file = '/work/wangyu/cityscape_test.tfrecord'
             self._img_indices = self._load_img_indicies()
         else:
             sys.exit('No valid mode!')
@@ -500,7 +500,7 @@ class CityDataSet():
             fname = img_inx[6]
             fname = fname.split('_')
             fname = fname[0]+'_'+fname[1]+'_'+fname[2]
-            trainId_name = fname+'_trainIds.png'
+            trainId_name = fname + '_trainIds.png'
             wt_name = fname + '_wtpred.png'
             save_semtrainIDs_path = os.path.join(self._semtrainIDs_save_path, trainId_name)
             save_wt_path = os.path.join(self._wt_save_path, wt_name)
@@ -563,7 +563,7 @@ class CityDataSet():
         print('Loading {} set indices...'.format(mode))
         files_img = []
 
-        search_img = os.path.join('../data/CityDatabase', 'leftImg8bit', 'train',
+        search_img = os.path.join('../data/CityDatabase', 'leftImg8bit', mode,
                                   '*', '*_leftImg8bit.png')
         files_img = glob.glob(search_img)
         files_img.sort()
