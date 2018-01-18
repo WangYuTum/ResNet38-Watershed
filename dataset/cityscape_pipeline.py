@@ -264,6 +264,7 @@ class CityDataSet():
         image = tf.image.resize_images(example['img'], [512,1024], tf.image.ResizeMethod.BILINEAR)
         wt_gt0 = tf.cast(example['wt_gt'], tf.float32)
         # Assign weight to each discretized value: c_k
+        ## The previous assignment: 1x + 2x + ... + 16x = 1
         ## There're 16 discretized values [0,15]. The assignment looks like the following:
         ## 1^2x + 2^2x + 3^2x + ... + 16^2x = 1, x = 1 / 1496
         ## Therefore, the 0-level corresponds to a weight of 16^2*x, 1-level corresponds to 15^2*x
