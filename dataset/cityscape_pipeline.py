@@ -33,7 +33,7 @@ class CityDataSet():
     def __init__(self, params):
         '''mode: 'train_sem', 'val_sem', 'test_sem',
                  'train_grad', 'val_grad',
-                 'train_semgrad_full_joint' '''
+                 'train_semgrad' '''
 
         self._mode = params.get('mode','train_sem')
         self._batch_size = params.get('batch_size', 4)
@@ -86,9 +86,9 @@ class CityDataSet():
             self._TFrecord_file = '/work/wangyu/cityscape_train2.tfrecord'
         elif self._mode == 'val_grad':
             self._TFrecord_file = '/work/wangyu/cityscape_val2.tfrecord'
-        elif self._mode == 'train_grad_full' or self._mode =='train_semgrad_full_joint':
+        elif self._mode == 'train_grad_full' or self._mode =='train_semgrad':
             self._TFrecord_file = '/work/wangyu/cityscape_train_full.tfrecord'
-        elif self._mode == 'val_grad_full' or self._mode =='val_semgrad_full_joint':
+        elif self._mode == 'val_grad_full' or self._mode =='val_semgrad':
             self._TFrecord_file = '/work/wangyu/cityscape_train_val.tfrecord'
         else:
             sys.exit('No valid mode!')
@@ -330,9 +330,9 @@ class CityDataSet():
             dataset = self._build_gradtrain_pipeline(TFrecord_file=self._TFrecord_file)
         elif self._mode == 'val_grad':
             dataset = self._build_gradval_pipeline(TFrecord_file=self._TFrecord_file)
-        elif self._mode == 'train_grad_full' or self._mode == 'train_semgrad_full_joint':
+        elif self._mode == 'train_grad_full' or self._mode == 'train_semgrad':
             dataset = self._build_gradtrain_pipeline(TFrecord_file=self._TFrecord_file)
-        elif self._mode == 'val_grad_full' or self._mode == 'val_semgrad_full_joint':
+        elif self._mode == 'val_grad_full' or self._mode == 'val_semgrad':
             dataset = self._build_gradval_pipeline(TFrecord_file=self._TFrecord_file)
         else:
             sys.exit('Mode {} is not supported.'.format(self._mode))

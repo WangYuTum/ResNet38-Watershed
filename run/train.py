@@ -11,7 +11,7 @@ from core import resnet38
 
 # Prepare dataset
 os.environ['CUDA_VISIBLE_DEVICES'] = '0'
-train_data_params = {'mode': 'train_semgrad_full_joint', # NOTE: train semgrads on all classes jointly
+train_data_params = {'mode': 'train_semgrad', # NOTE: train semgrads on all classes, update graddir only
                      'batch_size': 3}
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
@@ -20,7 +20,7 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/watershed_pre-semgrad.npy',
+                'feed_weight': '../data/saved_weights/sem2_momen_batch4/watershed_prestage1a1_8s_ep65.npy',
                 'batch_size': 3,
                 'decay_rate': 0.00001,
                 'lr': 0.00001,
@@ -38,7 +38,7 @@ res38 = resnet38.ResNet38(model_params)
                                    grad_gt=next_batch['grad_gt'], params=model_params)
 ###
 input_img_sum = tf.summary.image('input_img', next_batch['img'])
-input_sem_sum = tf.summary.image('input_sem', tf.cast(next_batch['sem_gt'], tf.float16))
+# input_sem_sum = tf.summary.image('input_sem', tf.cast(next_batch['sem_gt'], tf.float16))
 input_grad_sum = tf.summary.image('input_grad', tf.concat([next_batch['grad_gt'][:,:,:,0:2], tf.zeros([model_params['batch_size'],64,128,1])], axis=-1))
 ###
 
@@ -50,7 +50,7 @@ init = tf.global_variables_initializer()
 with tf.Session() as sess:
     save_path = model_params['save_path']
     batch_size = model_params['batch_size']
-    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'semgrad_full_joint/adam_batch3/', sess.graph)
+    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'semgrad_full/adam_batch3/', sess.graph)
 
     sess.run(init)
     num_iters = np.int32(num_train / batch_size) + 1
@@ -67,7 +67,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/semgrad_full_joint_adam_batch3/watershed_presema1_semgrad8s_ep%d.npy'%(epoch)
+                save_name = '/semgrad_full_adam_batch3/watershed_presema1_semgrad8s_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 
