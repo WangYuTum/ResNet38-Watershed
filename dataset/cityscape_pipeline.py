@@ -265,11 +265,12 @@ class CityDataSet():
         wt_gt0 = tf.cast(example['wt_gt'], tf.float32)
         # Assign weight to each discretized value: c_k
         ## There're 16 discretized values [0,15]. The assignment looks like the following:
-        ## x + 2x + 3x + ... + 16x = 1, x = 1/136
-        ## Therefore, the 0-level corresponds to a weight of 16*x, 1-level corresponds to 15*x
+        ## 1^2x + 2^2x + 3^2x + ... + 16^2x = 1, x = 1 / 1496
+        ## Therefore, the 0-level corresponds to a weight of 16^2*x, 1-level corresponds to 15^2*x
         wt_gt = wt_gt0 - 16.0
         wt_gt = tf.abs(wt_gt)
-        wt_gt = tf.multiply(wt_gt, 1.0/136.0)
+        wt_gt = tf.multiply(wt_gt, wt_gt)
+        wt_gt = tf.multiply(wt_gt, 1.0/1496.0)
         wt_gt = tf.concat([wt_gt0, wt_gt], axis=-1)
         wt_gt = tf.image.resize_images(wt_gt, [256,512], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
@@ -386,10 +387,10 @@ class CityDataSet():
 
         dataset = tf.contrib.data.TFRecordDataset(TFrecord_file, "GZIP")
         dataset = dataset.repeat()
-        dataset = dataset.map(self._parse_single_record, num_threads=3, output_buffer_size=9)
-        dataset = dataset.map(self._image_standardization, num_threads=3, output_buffer_size=9)
-        dataset = dataset = dataset.map(self._final_train_transform, num_threads=3, output_buffer_size=9)
-        dataset = dataset.shuffle(buffer_size=9)
+        dataset = dataset.map(self._parse_single_record, num_threads=2, output_buffer_size=8)
+        dataset = dataset.map(self._image_standardization, num_threads=2, output_buffer_size=8)
+        dataset = dataset = dataset.map(self._final_train_transform, num_threads=2, output_buffer_size=8)
+        dataset = dataset.shuffle(buffer_size=1500)
         dataset = dataset.batch(self._batch_size)
 
         return dataset
@@ -506,8 +507,12 @@ class CityDataSet():
             save_wt_path = os.path.join(self._wt_save_path, wt_name)
 
             # Reshape to [H,W]
-            pred_sem_label = np.reshape(pred_sem[i%self._batch_size,:,:], (1024,2048))
-            pred_wt_label = np.reshape(pred_wt[i%self._batch_size,:,:], (1024,2048))
+            if self._batch_size != 1:
+                pred_sem_label = np.reshape(pred_sem[i%self._batch_size,:,:], (1024,2048))
+                pred_wt_label = np.reshape(pred_wt[i%self._batch_size,:,:], (1024,2048))
+            else:
+                pred_sem_label = pred_sem
+                pred_wt_label = pred_wt
             # Save .png, don't rescale
             toimage(pred_sem_label, high=18, low=0, cmin=0, cmax=18).save(save_semtrainIDs_path)
             toimage(pred_wt_label, high=15, low=0, cmin=0, cmax=15).save(save_wt_path)

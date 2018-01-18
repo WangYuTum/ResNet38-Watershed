@@ -10,7 +10,7 @@ import data_utils as dt
 from core import resnet38
 
 # Prepare dataset
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 train_data_params = {'mode': 'train_final', # NOTE: train sem/wt on all classes jointly
                      'batch_size': 2}
 # The data pipeline should be on CPU
@@ -20,7 +20,7 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/watershed_pre-semgradwt.npy',
+                'feed_weight': '../data/saved_weights/watershed_pre-sem-gradswt.npy',
                 'batch_size': 2,
                 'decay_rate': 1e-5,
                 'lr': 5e-6,
@@ -28,7 +28,7 @@ model_params = {'num_classes': 19,
                 'save_path': '../data/saved_weights/',
                 'tsboard_save_path': '../data/tsboard/'}
 train_ep = 19
-save_ep = 3
+save_ep = 2
 num_train = 2975
 
 # Build network
@@ -53,13 +53,15 @@ init = tf.global_variables_initializer()
 with tf.Session() as sess:
     save_path = model_params['save_path']
     batch_size = model_params['batch_size']
-    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'final/adam_batch3/', sess.graph)
+    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'final/adam_batch2/', sess.graph)
 
     sess.run(init)
     num_iters = np.int32(num_train / batch_size) + 1
     print('Start training...')
     for epoch in range(train_ep):
         print('Eopch %d'%epoch)
+        TrainEp = tf.summary.scalar('train_epoch', epoch)
+        Train_summary = tf.summary.merge([Train_summary, TrainEp])
         for iters in range(num_iters):
             [train_op_, loss_, Train_summary_] = sess.run([train_op, total_loss, Train_summary])
             writer.add_summary(Train_summary_, iters)
@@ -70,7 +72,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/final_adam_batch3/watershed_presemgradswta1_final8s_ep%d.npy'%(epoch)
+                save_name = '/final_adam_batch2/watershed_final8s2_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 

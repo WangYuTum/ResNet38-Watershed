@@ -70,8 +70,8 @@ with tf.Session() as sess:
 
     #print("Inference done! Start transforming to colored ...")
     #CityData.pred_to_color()
-    #print("Start transforming to labelIDs ...")
-    #CityData.pred_to_labelID()
-    #print("Transform done! Ready to generate evaluation files.")
-    #print("Start evaluating semantic accuracy ...")
-    #accuracy = evalPixelSemantic.run_eval('../data/sempred')
+    print("Start transforming to labelIDs ...")
+    CityData.pred_to_labelID()
+    print("Transform done! Ready to generate evaluation files.")
+    print("Start evaluating semantic accuracy ...")
+    accuracy = evalPixelSemantic.run_eval('../data/sempred')
