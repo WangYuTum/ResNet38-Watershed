@@ -217,11 +217,18 @@ class CityDataSet():
                 * sem_gt has shape: [64,128,1], tf.int32
                 * grad_gt has shape: [64,128,3], tf.float32
         '''
-        ##NOTE: MUST no random flip.
         # Resize
         image = tf.image.resize_images(example['img'], [512,1024], tf.image.ResizeMethod.BILINEAR)
         sem_gt = tf.image.resize_images(example['sem_gt'], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
         grad_gt = tf.image.resize_images(example['grad_gt'], [64,128], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+
+        # Randomly flip
+        rand_val = tf.random_uniform(shape=[1], minval=0, maxval=1, dtype=tf.float32)
+        flip_bool = tf.less_equal(rand_val,[0.5])
+        flip_bool = tf.reshape(flip_bool, [])
+        image = tf.cond(flip_bool, lambda: tf.image.flip_left_right(image), lambda: image)
+        sem_gt = tf.cond(flip_bool, lambda: tf.image.flip_left_right(sem_gt), lambda: sem_gt)
+        grad_gt = tf.cond(flip_bool, lambda: self._flip_grad(grad_gt), lambda: grad_gt)
 
 
         # Pack the result
@@ -232,6 +239,19 @@ class CityDataSet():
         # transformed['wt_gt'] = example['wt_gt']
 
         return transformed
+
+    def _flip_grad(self, grad_gt):
+        '''
+            Given: grad_gt [H, W, 3]
+            Ouput: horizontly fliped [H,W,3]
+        '''
+        y_grad = -grad_gt[:,:,1:2]
+        x_grad = grad_gt[:,:,0:1]
+        w_grad = grad_gt[:,:,2:3]
+        new_grad = tf.concat([x_grad, y_grad, w_grad], axis=-1)
+        fliped = tf.image.flip_left_right(new_grad)
+
+        return fliped
 
     def _build_semtrain_pipeline(self, TFrecord_file):
         '''
