@@ -238,12 +238,14 @@ class CityDataSet():
         wt_gt0 = tf.cast(example['wt_gt'], tf.float32)
 
         # Assign weight to each discretized value: c_k
+        ## Previous assignments: x + 2x + 3x + ... + 16x = 1, x = 1/136
         ## There're 16 discretized values [0,15]. The assignment looks like the following:
-        ## x + 2x + 3x + ... + 16x = 1, x = 1/136
-        ## Therefore, the 0-level corresponds to a weight of 16*x, 1-level corresponds to 15*x
+        ## 1^2x + 2^2x + 3^2x + ... + 16^2x = 1, x = 1 / 1496
+        ## Therefore, the 0-level corresponds to a weight of 16^2*x, 1-level corresponds to 15^2*x
         wt_gt = wt_gt0 - 16.0
         wt_gt = tf.abs(wt_gt)
-        wt_gt = tf.multiply(wt_gt, 1.0/136.0)
+        wt_gt = tf.multiply(wt_gt, wt_gt)
+        wt_gt = tf.multiply(wt_gt, 1.0/1496.0)
         wt_gt = tf.concat([wt_gt0, wt_gt], axis=-1)
 
         # Resize

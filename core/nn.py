@@ -299,7 +299,7 @@ def WT_B0(data_format, input_tensor, feed_dict, shape, var_dict=None):
 
     # The dilated conv
     with tf.variable_scope('conv1'):
-        CONV_out1 = conv_dilate_layer(data_format, RELU_out1, feed_dict, 12,
+        CONV_out1 = conv_layer(data_format, RELU_out1, feed_dict, 1,
                                       'SAME', shape, var_dict)
 
     return CONV_out1

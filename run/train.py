@@ -10,9 +10,9 @@ import data_utils as dt
 from core import resnet38
 
 # Prepare dataset
-os.environ['CUDA_VISIBLE_DEVICES'] = '0'
+os.environ['CUDA_VISIBLE_DEVICES'] = '1'
 config_gpu = tf.ConfigProto()
-config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.4
+config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.9
 train_data_params = {'mode': 'train_wt_full',
                      'batch_size': 6}
 # The data pipeline should be on CPU
