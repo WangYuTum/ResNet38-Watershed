@@ -53,7 +53,7 @@ init = tf.global_variables_initializer()
 with tf.Session(config=config_gpu) as sess:
     save_path = model_params['save_path']
     batch_size = model_params['batch_size']
-    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'wt_full/adam_batch6_weighted/', sess.graph)
+    writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'wt_full/adam_batch6_weighted/linear_exponential_rand_flip/', sess.graph)
 
     sess.run(init)
     num_iters = np.int32(num_train / batch_size) + 1
@@ -70,7 +70,7 @@ with tf.Session(config=config_gpu) as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/wt_full_adam_batch6_weighted/watershed_preimga1_wt8s_ep%d.npy'%(epoch)
+                save_name = '/wt_full_adam_batch6_weighted/watershed_preimga1_wt8s_ep%d_rand_flip_linear_exp.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 

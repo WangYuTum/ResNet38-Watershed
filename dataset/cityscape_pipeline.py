@@ -237,16 +237,24 @@ class CityDataSet():
         '''
         wt_gt0 = tf.cast(example['wt_gt'], tf.float32)
 
-        # Assign weight to each discretized value: c_k
-        ## Previous assignments: x + 2x + 3x + ... + 16x = 1, x = 1/136
-        ## There're 16 discretized values [0,15]. The assignment looks like the following:
-        ## 1^2x + 2^2x + 3^2x + ... + 16^2x = 1, x = 1 / 1496
-        ## Therefore, the 0-level corresponds to a weight of 16^2*x, 1-level corresponds to 15^2*x
+        # Assign weight to each discretized value: c_k, there're 16 discretized values [0,15].
+        ## Linear penalty: x + 2x + 3x + ... + 16x = 1, x = 1/136
+        ## Quadratic penalty: 1^2x + 2^2x + 3^2x + ... + 16^2x = 1, x = 1 / 1496
+        ## Linear-exponential penalty: x + 2x + 3x + ... + 13x + 26x + 52x + 104x = 1, x = 1 / 274
         wt_gt = wt_gt0 - 16.0
         wt_gt = tf.abs(wt_gt)
         wt_gt = tf.multiply(wt_gt, wt_gt)
+        # wt_gt = self._trans_penalty(wt_gt)
         wt_gt = tf.multiply(wt_gt, 1.0/1496.0)
         wt_gt = tf.concat([wt_gt0, wt_gt], axis=-1)
+
+        # Random flip
+        rand_val = tf.random_uniform(shape=[1], minval=0, maxval=1, dtype=tf.float32)
+        flip_bool = tf.less_equal(rand_val, [0.5])
+        flip_bool = tf.reshape(flip_bool, [])
+        grad_gt = tf.cond(flip_bool, lambda: self._flip_grad(example['grad_gt']), lambda: example['grad_gt'])
+        sem_gt = tf.cond(flip_bool, lambda: tf.image.flip_left_right(example['sem_gt']), lambda: example['sem_gt'])
+        wt_gt = tf.cond(flip_bool, lambda: tf.image.flip_left_right(wt_gt), lambda: wt_gt)
 
         # Resize
         # sem_gt = tf.image.resize_images(example['sem_gt'], [256,512], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
@@ -254,11 +262,45 @@ class CityDataSet():
 
         # Pack the result
         transformed = {}
-        transformed['grad_gt'] = example['grad_gt']
-        transformed['sem_gt'] = example['sem_gt']
+        transformed['grad_gt'] = grad_gt
+        transformed['sem_gt'] = sem_gt
         transformed['wt_gt'] = wt_gt
 
         return transformed
+
+    def _trans_penalty(self, wt_gt):
+        '''
+            Add penalty accordingly in the mode of linear_exponential.
+        '''
+        # For level 14
+        bool1 = tf.equal(wt_gt, 14.0)
+        bool1_val = tf.cast(bool1, tf.float32) * 12.0
+        wt_gt = tf.add(wt_gt, bool1_val)
+
+        # For level 15
+        bool2 = tf.equal(wt_gt, 15.0)
+        bool2_val = tf.cast(bool2, tf.float32) * 37.0
+        wt_gt = tf.add(wt_gt, bool2_val)
+
+        # For level 16
+        bool3 = tf.equal(wt_gt, 16.0)
+        bool3_val = tf.cast(bool3, tf.float32) * 88.0
+        wt_gt = tf.add(wt_gt, bool3_val)
+
+        return wt_gt
+
+    def _flip_grad(self, grad_gt):
+        '''
+            Given: grad_gt [H, W, 3]
+            Output: horizontly flipped [H, w, 3]
+        '''
+        y_grad = -grad_gt[:,:,1:2]
+        x_grad = grad_gt[:,:,0:1]
+        w_grad = grad_gt[:,:,2:3]
+        new_grad = tf.concat([x_grad, y_grad, w_grad], axis=-1)
+        fliped = tf.image.flip_left_right(new_grad)
+
+        return fliped
 
     def _build_semtrain_pipeline(self, TFrecord_file):
         '''
