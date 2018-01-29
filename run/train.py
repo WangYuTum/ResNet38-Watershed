@@ -20,7 +20,7 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/watershed_pre-sem-gradswt.npy',
+                'feed_weight': '../data/saved_weights/watershed_pre-sem-grad-wt.npy',
                 'batch_size': 2,
                 'decay_rate': 1e-5,
                 'lr': 5e-6,
@@ -60,19 +60,17 @@ with tf.Session() as sess:
     print('Start training...')
     for epoch in range(train_ep):
         print('Eopch %d'%epoch)
-        TrainEp = tf.summary.scalar('train_epoch', epoch)
-        Train_summary = tf.summary.merge([Train_summary, TrainEp])
         for iters in range(num_iters):
             [train_op_, loss_, Train_summary_] = sess.run([train_op, total_loss, Train_summary])
             writer.add_summary(Train_summary_, iters)
-            if iters % 10 == 0:
+            if iters % 5 == 0:
                 print('Iter {} total loss: {}'.format(iters, loss_))
         if epoch % save_ep == 0 and epoch !=0:
             print('Save trained weight after epoch: %d'%epoch)
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/final_adam_batch2/watershed_final8s2_ep%d.npy'%(epoch)
+                save_name = '/final_adam_batch2/watershed_final8s_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 

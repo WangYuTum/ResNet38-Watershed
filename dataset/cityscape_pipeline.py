@@ -264,7 +264,6 @@ class CityDataSet():
         image = tf.image.resize_images(example['img'], [512,1024], tf.image.ResizeMethod.BILINEAR)
         wt_gt0 = tf.cast(example['wt_gt'], tf.float32)
         # Assign weight to each discretized value: c_k
-        ## The previous assignment: 1x + 2x + ... + 16x = 1
         ## There're 16 discretized values [0,15]. The assignment looks like the following:
         ## 1^2x + 2^2x + 3^2x + ... + 16^2x = 1, x = 1 / 1496
         ## Therefore, the 0-level corresponds to a weight of 16^2*x, 1-level corresponds to 15^2*x
@@ -275,11 +274,21 @@ class CityDataSet():
         wt_gt = tf.concat([wt_gt0, wt_gt], axis=-1)
         wt_gt = tf.image.resize_images(wt_gt, [256,512], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
 
+        ## Random flip
+        rand_val = tf.random_uniform(shape=[1], minval=0, maxval=1, dtype=tf.float32)
+        flip_bool = tf.less_equal(rand_val, [0.5])
+        flip_bool = tf.reshape(flip_bool, [])
+        image = tf.cond(flip_bool, lambda: tf.image.flip_left_right(image), lambda: image)
+        sem_gt = tf.cond(flip_bool, lambda: tf.image.flip_left_right(example['sem_gt']), lambda: example['sem_gt'])
+        # No need to adjust dir vetor because only the 3rd channel weight is needed for training
+        grad_gt = tf.cond(flip_bool, lambda: tf.image.flip_left_right(example['grad_gt']), lambda: example['grad_gt'])
+        wt_gt = tf.cond(flip_bool, lambda: tf.image.flip_left_right(wt_gt), lambda: wt_gt)
+
         # Pack the result
         transformed = {}
         transformed['img'] = image
-        transformed['sem_gt'] = example['sem_gt']
-        transformed['grad_gt'] = example['grad_gt']
+        transformed['sem_gt'] = sem_gt
+        transformed['grad_gt'] = grad_gt
         transformed['wt_gt'] = wt_gt
 
         return transformed
