@@ -20,14 +20,14 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/gradswt_full_adam_batch3/watershed_pregradswta1_gradswt8s_ep6.npy',
+                'feed_weight': '../data/saved_weights/watershed_pre-sem-grad-wt.npy',
                 'batch_size': 3,
                 'decay_rate': 1e-5,
                 'lr': 5e-6,
                 'data_format': "NCHW", # optimal for cudnn
                 'save_path': '../data/saved_weights/',
                 'tsboard_save_path': '../data/tsboard/'}
-train_ep = 13
+train_ep = 16
 save_ep = 3
 num_train = 2975
 
@@ -68,7 +68,7 @@ with tf.Session() as sess:
             save_npy = sess.run(save_dict_op)
             save_path = model_params['save_path']
             if len(save_npy.keys()) != 0:
-                save_name = '/gradswt_full_adam_batch3/watershed_pregradswta1_gradswt8s_ep%d.npy'%(epoch+6)
+                save_name = '/gradswt_full_adam_batch3/watershed_pre-grad-wt_gradswt8s_ep%d.npy'%(epoch)
                 save_path = save_path + save_name
                 np.save(save_path, save_npy)
 

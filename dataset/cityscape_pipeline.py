@@ -265,22 +265,45 @@ class CityDataSet():
         wt_gt0 = tf.cast(example['wt_gt'], tf.float32)
         # Assign weight to each discretized value: c_k
         ## There're 16 discretized values [0,15]. The assignment looks like the following:
-        ## x + 2x + 3x + ... + 16x = 1, x = 1/136
-        ## Therefore, the 0-level corresponds to a weight of 16*x, 1-level corresponds to 15*x
+        ## Linear penalty: x + 2x + 3x + ... + 16x = 1, x = 1/136
+        ## Quadratic penalty: 1^2x + 2^2x + 3^2x + ... + 16^2x = 1, x = 1 / 1496
+        ## Linear-exponential penalty: x + 2x + 3x + ... + 13x + 26x + 52x + 104x = 1, x = 1 / 274
         wt_gt = wt_gt0 - 16.0
         wt_gt = tf.abs(wt_gt)
-        wt_gt = tf.multiply(wt_gt, 1.0/136.0)
+        wt_gt = tf.multiply(wt_gt, wt_gt)
+        wt_gt = tf.multiply(wt_gt, 1.0/1496.0)
         wt_gt = tf.concat([wt_gt0, wt_gt], axis=-1)
         wt_gt = tf.image.resize_images(wt_gt, [256,512], tf.image.ResizeMethod.NEAREST_NEIGHBOR)
+
+        ## random flip
+        rand_val = tf.random_uniform(shape=[1], minval=0, maxval=1, dtype=tf.float32)
+        flip_bool = tf.less_equal(rand_val, [0.5])
+        flip_bool = tf.reshape(flip_bool, [])
+        image = tf.cond(flip_bool, lambda: tf.image.flip_left_right(image), lambda: image)
+        sem_gt = tf.cond(flip_bool, lambda: tf.image.flip_left_right(example['sem_gt']), lambda: example['sem_gt'])
+        grad_gt = tf.cond(flip_bool, lambda: self._flip_grad(example['grad_gt']), lambda: example['grad_gt'])
+        wt_gt = tf.cond(flip_bool, lambda: tf.image.flip_left_right(wt_gt), lambda: wt_gt)
 
         # Pack the result
         transformed = {}
         transformed['img'] = image
-        transformed['sem_gt'] = example['sem_gt']
-        transformed['grad_gt'] = example['grad_gt']
+        transformed['sem_gt'] = sem_gt
+        transformed['grad_gt'] = grad_gt
         transformed['wt_gt'] = wt_gt
 
         return transformed
+
+    def _flip_grad(self, grad_gt):
+        '''
+            Given: grad_gt [H, W, 3]
+            Output: horizontly flipped [H, w, 3]
+        '''
+        y_grad = -grad_gt[:,:,1:2]
+        x_grad = grad_gt[:,:,0:1]
+        w_grad = grad_gt[:,:,2:3]
+        new_grad = tf.concat([x_grad, y_grad, w_grad], axis=-1)
+        fliped = tf.image.flip_left_right(new_grad)
+        return fliped
 
 
     def _build_semtrain_pipeline(self, TFrecord_file):
