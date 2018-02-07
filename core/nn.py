@@ -347,8 +347,8 @@ def BN(data_format, input_tensor, feed_dict=None, bn_scope=None,is_train=False, 
         bn_fused=False
         # fix moving statistics and trainable variables in shared layers
         if scope_name.find('shared') != -1:
-            bn_training = False
-            bn_trainable = False
+            bn_training = True
+            bn_trainable = True
         else:
             bn_training = True
             bn_trainable = True
@@ -411,7 +411,7 @@ def get_conv_kernel(feed_dict, shape):
 
     # during alternate training, fix variables in shared layers
     if scope_name.find('shared') != -1:
-        var = tf.get_variable(name='kernel', initializer=init, shape=shape, trainable=False)
+        var = tf.get_variable(name='kernel', initializer=init, shape=shape, trainable=True)
     else:
         var = tf.get_variable(name='kernel', initializer=init, shape=shape, trainable=True)
 
@@ -475,7 +475,7 @@ def get_bias(feed_dict, shape):
 
     # during alternate training, fix variables in shared layers
     if scope_name.find('shared') != -1:
-        var = tf.get_variable(name="bias", initializer=init, shape=shape, trainable=False)
+        var = tf.get_variable(name="bias", initializer=init, shape=shape, trainable=True)
     else:
         var = tf.get_variable(name='kernel', initializer=init, shape=shape, trainable=True)
 
