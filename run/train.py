@@ -10,9 +10,9 @@ import data_utils as dt
 from core import resnet38
 
 # Prepare dataset
-os.environ['CUDA_VISIBLE_DEVICES'] = '1'
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 train_data_params = {'mode': 'train_final', # NOTE: train sem/wt on all classes jointly
-                     'batch_size': 2}
+                     'batch_size': 1}
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
     CityData = dt.CityDataSet(train_data_params)
@@ -20,8 +20,8 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/watershed_pre-sem-grad-wt.npy',
-                'batch_size': 2,
+                'feed_weight': '../data/saved_weights/watershed_pre-sem-gradswt.npy',
+                'batch_size': 1,
                 'decay_rate': 1e-5,
                 'lr': 5e-6,
                 'data_format': "NCHW", # optimal for cudnn

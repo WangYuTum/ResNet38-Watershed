@@ -426,10 +426,10 @@ def BN(data_format, input_tensor, feed_dict=None, bn_scope=None,is_train=False, 
         bn_fused=False
         # Train all params jointly
         if scope_name.find('shared') != -1:
-            bn_training = True
+            bn_training = False
             bn_trainable = True
         else:
-            bn_training = True
+            bn_training = False
             bn_trainable = True
     if data_format == 'NCHW':
         norm_axis=1
