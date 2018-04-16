@@ -50,7 +50,8 @@ TrainLoss_sum = tf.summary.scalar('train_loss', loss)
 Train_summary = tf.summary.merge_all()
 init = tf.global_variables_initializer()
 
-with tf.Session(config=config_gpu) as sess:
+# with tf.Session(config=config_gpu) as sess:
+with tf.Session() as sess:
     save_path = model_params['save_path']
     batch_size = model_params['batch_size']
     writer = tf.summary.FileWriter(model_params['tsboard_save_path']+'WTN/adam_batch3/', sess.graph)
