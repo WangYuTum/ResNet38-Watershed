@@ -17,6 +17,7 @@ from __future__ import print_function
 
 import tensorflow as tf
 import numpy as np
+from PIL import Image
 from scipy.misc import imsave
 import sys
 import os
@@ -33,7 +34,7 @@ class CityDataSet():
     def __init__(self, params):
         '''mode: 'train_sem', 'val_sem', 'test_sem',
                  'train_grad', 'val_grad',
-                 'train_gradswt', 'val_gradswt' '''
+                 'train_gradswt', 'val_gradswt', 'test_final' '''
 
         self._mode = params.get('mode','train_sem')
         self._batch_size = params.get('batch_size', 4)
@@ -43,7 +44,7 @@ class CityDataSet():
         self._img_indices = None
         self._batch_idx = 0
 
-        self._pred_save_path = params.get('pred_save_path','../data/pred_trainIDs')
+        self._pred_save_path = params.get('pred_save_path','../data/wtpred')
         self._colored_save_path = params.get('colored_save_path', '../data/pred_colored')
         self._labelIDs_save_path = params.get('labelIDs_save_path', '../data/pred_labelIDs')
 
@@ -79,7 +80,7 @@ class CityDataSet():
         elif self._mode == 'val_sem':
             self._TFrecord_file = '/work/wangyu/cityscape_val.tfrecord'
             self._img_indices = self._load_img_indicies()
-        elif self._mode == 'test_sem':
+        elif self._mode == 'test_sem' or self._mode == 'test_final':
             self._TFrecord_file = '/work/wangyu/cityscape_test.tfrecord'
             self._img_indices = self._load_img_indicies()
         elif self._mode == 'train_grad':
@@ -105,12 +106,13 @@ class CityDataSet():
             Return: data_dict'''
 
         # TFrecords format for cityscape dataset
-        if self._mode.find('test') != -1:
+        if self._mode.find('test_final') != -1:
             # This is in test mode
             record_features = {
                 "height": tf.FixedLenFeature([1],tf.int64),
                 "width": tf.FixedLenFeature([1],tf.int64),
-                "img": tf.FixedLenFeature([1024, 2048, 3],tf.int64)
+                "img": tf.FixedLenFeature([1024, 2048, 3],tf.int64),
+                "sem": tf.FixedLenFeature([1024, 2048, 1],tf.int64)
             }
         else:
             # In any train mode
@@ -128,8 +130,9 @@ class CityDataSet():
 
         # Cast RGB pixels to tf.float32
         data_dict['img'] = tf.cast(out_data['img'], tf.float32)
-        if self._mode.find('test') != -1:
+        if self._mode.find('test_final') != -1:
             # This is in test mode
+            data_dict['sem_gt'] = tf.cast(out_data['sem'], tf.int32)
             return data_dict
         else:
             data_dict['sem_gt'] = tf.cast(out_data['sem_gt'], tf.int32)
@@ -165,6 +168,7 @@ class CityDataSet():
         transformed = {}
         transformed['img'] = rgb_img
         if self._mode.find('test') != -1:
+            transformed['sem_gt'] = example['sem_gt']
             return transformed
         else:
             transformed['sem_gt'] = example['sem_gt']
@@ -405,6 +409,18 @@ class CityDataSet():
         dataset = dataset.shuffle(buffer_size=1500)
         dataset = dataset.batch(self._batch_size)
 
+    def _build_finaltest_pipeline(self, TFrecord_file):
+        '''
+            The pipeline for final test.
+                - May choose to use test semantic result, e.g. during gating
+                - May ignore semantic result, e.g. joint estimate semantic & watershed
+        '''
+        #NOTE: Only go through .tfrecord once and no shuffle
+        dataset = tf.contrib.data.TFRecordDataset(TFrecord_file, "GZIP")
+        dataset = dataset.map(self._parse_single_record, num_threads=4, output_buffer_size=8)
+        dataset = dataset.map(self._image_standardization, num_threads=4, output_buffer_size=8)
+        dataset = dataset.batch(self._batch_size)
+
         return dataset
 
     def _build_gradswtval_pipeline(self, TFrecord_file):
@@ -431,6 +447,8 @@ class CityDataSet():
             dataset = self._build_semval_pipeline(TFrecord_file=self._TFrecord_file)
         elif self._mode == 'test_sem':
             dataset = self._build_semtest_pipeline(TFrecord_file=self._TFrecord_file)
+        elif self._mode == 'test_final':
+            dataset = self._build_finaltest_pipeline(TFrecord_file=self._TFrecord_file)
         elif self._mode == 'train_grad':
             dataset = self._build_gradtrain_pipeline(TFrecord_file=self._TFrecord_file)
         elif self._mode == 'val_grad':
@@ -518,14 +536,16 @@ class CityDataSet():
             # eg, ../data/CityDatabase/leftImg8bit/val/frankfurt/frankfurt_000000_000294_leftImg8bit.png
             fname = img_inx[6]
             fname = fname.split('_')
-            fname = fname[0]+'_'+fname[1]+'_'+fname[2]+'_trainIds.png'
+            fname = fname[0]+'_'+fname[1]+'_'+fname[2]+'_wtpred.png'
             save_path = os.path.join(self._pred_save_path,fname)
 
             # Reshape to [H,W]
-            pred_label = np.reshape(pred_in[i%self._batch_size,:,:], (1024,2048))
+            pred_label = np.reshape(pred_in, (1024,2048))
             # Save .png, don't rescale
-            toimage(pred_label, high=18, low=0, cmin=0, cmax=18).save(save_path)
-            print("TrainIDs prediction saved to %s "%save_path)
+            img_obj = Image.fromarray(pred_label, mode='L')
+            img_obj.save(save_path, 'PNG')
+            # toimage(pred_label, high=18, low=0, cmin=0, cmax=18).save(save_path)
+            print("WT prediction saved to %s "%save_path)
 
         # Update batch index
         self._batch_idx += self._batch_size
@@ -563,11 +583,11 @@ class CityDataSet():
             imsave(output_img, image)
             print("LabelIDs prediction saved to %s"%output_img)
 
-    def _load_valimg_indicies(self):
+    def _load_img_indicies(self):
         '''
             Load image names for inference.
         '''
-        if self._mode.find('test') != -1:
+        if self._mode.find('test_final') != -1:
             mode = 'test'
         elif self._mode.find('val') != -1:
             mode = 'val'

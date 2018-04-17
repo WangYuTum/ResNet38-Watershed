@@ -425,6 +425,7 @@ class ResNet38:
         # gate
         pred_label = self._gate(sem_gt, pred_label) # [batch_size, 1024, 2048, 1]
         pred_label = tf.cast(pred_label, tf.int32)
+        sum_pred = tf.summary.image('out_wt', tf.cast(pred_label, tf.float16))
 
         return pred_label
 
