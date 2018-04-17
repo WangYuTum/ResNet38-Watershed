@@ -10,11 +10,11 @@ import data_utils as dt
 from core import resnet38
 # from eval import evalPixelSemantic
 
-os.environ['CUDA_VISIBLE_DEVICES'] = '2'
+os.environ['CUDA_VISIBLE_DEVICES'] = ''
 config_gpu = tf.ConfigProto()
 config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.9
-test_data_params = {'mode': 'val_sem',
-                     'batch_size': 4}
+test_data_params = {'mode': 'test_sem',
+                     'batch_size': 1}
 
 # The data pipeline should be on CPU
 with tf.device('/cpu:0'):
@@ -23,21 +23,21 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/sem2_momen_batch4/watershed_precitya1_8s_ep140.npy',
-                'batch_size': 4,
-                'data_format': "NCHW", # optimal for cudnn
+                'feed_weight': '../data/saved_weights/sem2_momen_batch4/watershed_prestage1a1_8s_ep65.npy',
+                'batch_size': 1,
+                'data_format': "NHWC", # optimal for cudnn
                 }
 
 num_val = 500
 num_test = 1525
-iterations = int(num_val / model_params['batch_size'])
+iterations = int(num_test / model_params['batch_size'])
 
 res38 = resnet38.ResNet38(model_params)
 predict = res38.inf(image=next_batch['img'])
 init = tf.global_variables_initializer()
 
-# with tf.Session() as sess:
-with tf.Session(config=config_gpu) as sess:
+with tf.Session() as sess:
+#with tf.Session(config=config_gpu) as sess:
 
     sess.run(init)
     print('Finished building inference network ResNet38-8s')
