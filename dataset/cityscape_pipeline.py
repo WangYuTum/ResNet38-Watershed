@@ -18,6 +18,7 @@ from __future__ import print_function
 import tensorflow as tf
 import numpy as np
 from scipy.misc import imsave
+from PIL import Image
 import sys
 import os
 import glob
@@ -326,7 +327,9 @@ class CityDataSet():
             # Reshape to [H,W]
             pred_label = np.reshape(pred_in[i%self._batch_size,:,:], (1024,2048))
             # Save .png, don't rescale
-            toimage(pred_label, high=18, low=0, cmin=0, cmax=18).save(save_path)
+            img_obj = Image.fromarray(pred_label, mode='L')
+            img_obj.save(save_path, 'PNG')
+            # toimage(pred_label, high=18, low=0, cmin=0, cmax=18).save(save_path)
             print("TrainIDs prediction saved to %s "%save_path)
 
         # Update batch index
@@ -348,7 +351,8 @@ class CityDataSet():
 
         print("TrainIDs prediction has %d images."%len(files_img))
         for idx in range(len(files_img)):
-            img = imread(files_img[idx])
+            # img = imread(files_img[idx])
+            img = np.array(Image.open(files_img[idx]))
             H = img.shape[0]
             W = img.shape[1]
             image = np.array(img, dtype=np.uint8)
@@ -362,7 +366,9 @@ class CityDataSet():
             output_img = files_img[idx].replace(self._pred_save_path, self._labelIDs_save_path)
             output_img = output_img.replace('trainIds', 'labelIds')
 
-            imsave(output_img, image)
+            img_obj = Image.fromarray(image, mode='L')
+            img_obj.save(output_img, 'PNG')
+            # imsave(output_img, image)
             print("LabelIDs prediction saved to %s"%output_img)
 
     def _load_img_indicies(self):
