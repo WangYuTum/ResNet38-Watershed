@@ -10,7 +10,7 @@ import data_utils as dt
 from core import resnet38
 # from eval import evalPixelSemantic
 
-os.environ['CUDA_VISIBLE_DEVICES'] = ''
+os.environ['CUDA_VISIBLE_DEVICES'] = '0'
 config_gpu = tf.ConfigProto()
 config_gpu.gpu_options.per_process_gpu_memory_fraction = 0.9
 test_data_params = {'mode': 'test_sem',
@@ -25,7 +25,7 @@ with tf.device('/cpu:0'):
 model_params = {'num_classes': 19,
                 'feed_weight': '../data/saved_weights/sem2_momen_batch4/watershed_prestage1a1_8s_ep65.npy',
                 'batch_size': 1,
-                'data_format': "NHWC", # optimal for cudnn
+                'data_format': "NCHW", # optimal for cudnn
                 }
 
 num_val = 500
