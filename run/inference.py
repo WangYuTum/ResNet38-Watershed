@@ -32,7 +32,7 @@ model_params = {'num_classes': 19,
 
 num_val = 500
 num_test = 1525
-iterations = 1
+iterations = num_test
 batch = model_params['batch_size']
 
 res38 = resnet38.ResNet38(model_params)
@@ -61,7 +61,7 @@ with tf.Session(config=config_gpu) as sess:
             sum_writer.add_summary(sum_all_, i)
             # wt_obj = Image.fromarray(pred_img, 'L')
             # wt_obj.save('wt.png', 'PNG')
-            # CityData.save_trainID_img(pred_img)
+            CityData.save_trainID_img(pred_img)
             # print('Save pred to {0}'.format("pred_wt"+str(i*batch+j)+".npy"))
             # imsave("pred_grad%d.png"%(i*batch+j), pred_img) # Rescales image to 0-255
             # save to numpy array, to avoid rescale

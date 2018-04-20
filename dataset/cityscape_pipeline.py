@@ -542,6 +542,7 @@ class CityDataSet():
             # Reshape to [H,W]
             pred_label = np.reshape(pred_in, (1024,2048))
             # Save .png, don't rescale
+            pred_label = pred_label.astype(np.uint8)
             img_obj = Image.fromarray(pred_label, mode='L')
             img_obj.save(save_path, 'PNG')
             # toimage(pred_label, high=18, low=0, cmin=0, cmax=18).save(save_path)
