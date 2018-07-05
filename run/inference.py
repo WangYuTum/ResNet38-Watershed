@@ -25,7 +25,7 @@ with tf.device('/cpu:0'):
 
 # Hparameter
 model_params = {'num_classes': 19,
-                'feed_weight': '../data/saved_weights/final_adam_batch2/watershed_final8s_ep3.npy',
+                'feed_weight': '../data/saved_weights/final_adam_batch2/watershed_final8s_ep18.npy',
                 'batch_size': 1,
                 'data_format': "NCHW", # optimal for cudnn
                 }
@@ -39,7 +39,7 @@ batch = model_params['batch_size']
 
 res38 = resnet38.ResNet38(model_params)
 # Test on single image
-test_img = Image.open('../data/CityDatabase/leftImg8bit/test/berlin/berlin_000091_000019_leftImg8bit.png')
+test_img = Image.open('../data/CityDatabase/leftImg8bit/test/berlin/berlin_000004_000019_leftImg8bit.png')
 test_img = np.array(test_img, dtype=np.float32)
 test_img *= (1.0/255)
 mean = np.array([0.485, 0.456, 0.406]).reshape((1,1,3))
@@ -68,8 +68,8 @@ with tf.Session() as sess:
         CityData.save_trainID_img(pred_sem_label, pred_wt_label, True, True)
         #TODO: save sem_prob_
 
-    #print("Inference done! Start transforming to colored ...")
-    #CityData.pred_to_color()
+    print("Inference done! Start transforming to colored ...")
+    CityData.pred_to_color()
     #print("Start transforming to labelIDs ...")
     #CityData.pred_to_labelID()
     #print("Transform done! Ready to generate evaluation files.")

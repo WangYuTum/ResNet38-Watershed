@@ -468,7 +468,7 @@ class CityDataSet():
             Input:  self._pred_save_path, original prediction images with trainIDs. Each image has shape [H,W]
             Output: self._colored_save_path, converted color prediction images. Each image need to be [H,W,3]
         '''
-        search_img = os.path.join(self._pred_save_path, '*.png')
+        search_img = os.path.join(self._semtrainIDs_save_path, '*.png')
         img_files = glob.glob(search_img)
         img_files.sort()
 
@@ -489,7 +489,7 @@ class CityDataSet():
             # ../data/pred_trainIDs/fname.png
             img_inx = img_inx[3]
             img_inx = img_inx.replace('trainIDs', 'colored')
-            save_color_path = self._colored_save_path + '/' + img_inx
+            save_color_path = self._semcolored_save_path + '/' + img_inx
             imsave(save_color_path, pred)
             print('Colored prediction saved to %s '%save_color_path)
 
